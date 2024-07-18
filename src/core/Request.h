@@ -1,10 +1,9 @@
-// Request.h
 #pragma once
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-namespace http
+namespace canaspad
 {
 
     class Request
@@ -43,4 +42,4 @@ namespace http
         std::vector<std::pair<std::string, std::string>> m_multipartFormData;
     };
 
-} // namespace http
+} // namespace canaspad

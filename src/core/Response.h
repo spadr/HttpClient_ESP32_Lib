@@ -1,10 +1,9 @@
-// Response.h
 #pragma once
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-namespace http
+namespace canaspad
 {
 
     class Response
@@ -27,4 +26,4 @@ namespace http
         std::string m_body;
     };
 
-} // namespace http
+} // namespace canaspad

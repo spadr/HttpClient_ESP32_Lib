@@ -1,7 +1,6 @@
-// Response.cpp
 #include "Response.h"
 
-namespace http
+namespace canaspad
 {
 
     Response::Response() : m_statusCode(0) {}
@@ -41,4 +40,4 @@ namespace http
         m_body += data;
     }
 
-} // namespace http
+} // namespace canaspad

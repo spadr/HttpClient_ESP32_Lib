@@ -1,23 +1,11 @@
-// CookieJar.h
 #pragma once
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "Cookie.h"
 
-namespace http
+namespace canaspad
 {
-
-    class Cookie
-    {
-    public:
-        std::string name;
-        std::string value;
-        std::string domain;
-        std::string path;
-        bool secure;
-        bool httpOnly;
-        time_t expires;
-    };
 
     class CookieJar
     {
@@ -29,4 +17,4 @@ namespace http
         std::unordered_map<std::string, std::vector<Cookie>> m_cookies;
     };
 
-} // namespace http
+} // namespace canaspad

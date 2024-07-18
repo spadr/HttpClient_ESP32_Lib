@@ -1,7 +1,6 @@
-// Request.cpp
 #include "Request.h"
 
-namespace http
+namespace canaspad
 {
 
     Request::Request() : m_method(Method::GET) {}
@@ -61,4 +60,4 @@ namespace http
         return m_multipartFormData;
     }
 
-} // namespace http
+} // namespace canaspad
