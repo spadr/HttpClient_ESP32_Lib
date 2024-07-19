@@ -5,27 +5,50 @@
 #include <chrono>
 #include <thread>
 #include "../utils/Utils.h"
+#include "WiFiSecureConnection.h"
+#include "mock/MockWiFiClientSecure.h"
 
 namespace canaspad
 {
 
-    HttpClient::HttpClient(const ClientOptions &options)
-        : m_connectionPool(std::make_unique<ConnectionPool>(options)),
+    HttpClient::HttpClient(const ClientOptions &options, bool useMock)
+        : m_connectionPool(std::make_unique<ConnectionPool>(
+              options,
+              useMock ? std::shared_ptr<Connection>(new MockWiFiClientSecure())
+                      : std::shared_ptr<Connection>(new WiFiSecureConnection()))),
           m_auth(std::make_unique<Auth>(options)),
           m_proxy(std::make_unique<Proxy>(options)),
           m_isInitialized(true),
-          m_initializationError(ErrorCode::None, "")
+          m_initializationError(ErrorCode::None, ""),
+          m_useMock(useMock),
+          m_options(options)
     {
+        if (useMock)
+        {
+            m_mockConnection = std::static_pointer_cast<MockWiFiClientSecure>(m_connectionPool->getConnection());
+        }
         time_t now;
         time(&now);
         if (now < 3600 * 9)
         {
             m_isInitialized = false;
-            m_initializationError = (ErrorInfo(ErrorCode::TimeNotSet, "System time is not set. Please synchronize with NTP server."));
+            m_initializationError = (ErrorInfo(
+                ErrorCode::TimeNotSet,
+                "System time is not set. Please synchronize with NTP server."));
         }
     }
 
     HttpClient::~HttpClient() = default;
+
+    Connection *HttpClient::getConnection() const
+    {
+        auto connection = m_connectionPool->getConnection();
+        if (m_useMock)
+        {
+            return static_cast<MockWiFiClientSecure *>(connection.get());
+        }
+        return connection.get();
+    }
 
     bool HttpClient::checkTimeout(const std::chrono::steady_clock::time_point &start,
                                   const std::chrono::milliseconds &timeout) const
@@ -76,7 +99,16 @@ namespace canaspad
         std::string host = Utils::extractHost(modifiedRequest.getUrl());
         int port = Utils::extractPort(modifiedRequest.getUrl());
 
-        auto connection = m_connectionPool->getConnection(host, port);
+        std::shared_ptr<Connection> connection;
+        if (m_useMock)
+        {
+            connection = m_mockConnection;
+        }
+        else
+        {
+            connection = m_connectionPool->getConnection(host, port);
+        }
+
         if (!connection)
         {
             return Result<HttpResult>(ErrorInfo(ErrorCode::NetworkError, "Failed to get connection from pool"));

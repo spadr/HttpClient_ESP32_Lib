@@ -5,6 +5,8 @@
 
 struct tm timeInfo;
 
+#ifndef PIO_UNIT_TESTING
+
 void setup()
 {
     Serial.begin(115200);
@@ -89,3 +91,4 @@ void loop()
     // Your loop code
     delay(1000);
 }
+#endif // PIO_UNIT_TESTING
