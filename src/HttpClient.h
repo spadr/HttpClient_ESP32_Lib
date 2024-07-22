@@ -15,13 +15,15 @@
 #include "proxy/Proxy.h"
 #include "Result.h"
 #include "auth/Auth.h"
+#include "core/Connection.h" // Connection インターフェースのインクルードを追加
+
 namespace canaspad
 {
 
     class HttpClient
     {
     public:
-        HttpClient(const ClientOptions &options = ClientOptions());
+        HttpClient(const ClientOptions &options = ClientOptions(), bool useMock = false);
         ~HttpClient();
 
         struct Timeouts
@@ -46,15 +48,19 @@ namespace canaspad
         using ChunkCallback = std::function<void(const char *, size_t)>;
         Result<HttpResult> sendStreaming(const Request &request, ChunkCallback chunkCallback);
 
+        Connection *getConnection() const;
+
     private:
         std::unique_ptr<ConnectionPool> m_connectionPool;
+        std::shared_ptr<Connection> m_mockConnection;
         std::unique_ptr<Auth> m_auth;
         std::unique_ptr<Proxy> m_proxy;
         Timeouts m_timeouts;
-        bool m_cookiesEnabled;
+        bool m_cookiesEnabled = false;
         ClientOptions m_options;
         std::function<void(size_t, size_t)> m_progressCallback;
         std::function<void(const char *, size_t)> m_responseBodyCallback;
+        bool m_useMock = false;
 
         bool m_isInitialized = true;
         ErrorInfo m_initializationError;
