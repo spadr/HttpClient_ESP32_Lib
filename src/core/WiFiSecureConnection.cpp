@@ -1,5 +1,4 @@
 #include "WiFiSecureConnection.h"
-#include <Arduino.h>
 
 namespace canaspad
 {
@@ -24,61 +23,44 @@ namespace canaspad
 
     bool WiFiSecureConnection::connect(const std::string &host, int port)
     {
-        Serial.println("WiFiSecureConnection::connect - Start");
         // Keep-Alive接続のチェック
         if (isConnected() && isConnectionValid(host, port))
         {
-            Serial.println("Using existing Keep-Alive connection");
             return true;
         }
 
         // 新しい接続を確立
         auto connectStart = std::chrono::steady_clock::now();
 
-        if (!m_verifySsl)
-        {
-            setInsecure();
-            Serial.println("Insecure connection");
-        }
-        else
+        if (m_verifySsl)
         {
             if (!m_caCert.empty())
             {
-                Serial.println("Setting CA Cert...");
                 setCACert(m_caCert.c_str());
-                Serial.printf("caCert (length): %d\n", m_caCert.length());
-                Serial.println("CA Cert set in connect");
             }
 
             if (!m_clientCert.empty())
             {
-                Serial.println("Setting Client Cert...");
                 setCertificate(m_clientCert.c_str());
-                Serial.printf("clientCert (length): %d\n", m_clientCert.length());
-                Serial.println("Client Cert set in connect");
             }
 
             if (!m_privateKey.empty())
             {
-                Serial.println("Setting Private Key...");
                 setPrivateKey(m_privateKey.c_str());
-                Serial.printf("privateKey (length): %d\n", m_privateKey.length());
-                Serial.println("Private Key set in connect");
             }
+        }
+        else
+        {
+            setInsecure();
         }
 
         setTimeout(m_connectTimeout.count());
-        Serial.printf("Host: %s\n", host.c_str());
-        Serial.printf("Port: %d\n", port);
-
-        Serial.println("Attempting connection...");
         bool result = false;
 
         while (!result)
         {
             if (checkTimeout(connectStart, m_connectTimeout))
             {
-                Serial.println("Connection timeout");
                 return false;
             }
 
@@ -87,14 +69,10 @@ namespace canaspad
             if (!result)
             {
                 _lastError = getLastError();
-                Serial.printf("Connection failed. Error code: %d\n",
-                              _lastError); // getLastError() を呼び出す
                 // 短い遅延を入れて再試行
                 delay(100);
             }
         }
-
-        Serial.println(result ? "Connection successful" : "Connection failed");
 
         if (result)
         {
@@ -104,7 +82,6 @@ namespace canaspad
             m_connectedPort = port;
         }
 
-        Serial.println("WiFiSecureConnection::connect - End");
         return result;
     }
 
@@ -178,21 +155,16 @@ namespace canaspad
 
     void WiFiSecureConnection::setCACert(const char *rootCA)
     {
-        Serial.println("WiFiSecureConnection::setCACert");
         if (rootCA != nullptr)
         {
             m_caCert = std::string(rootCA);
             WiFiClientSecure::setCACert(m_caCert.c_str());
-            Serial.println("CA Cert set:");
-            Serial.println(m_caCert.length());
         }
         else
         {
             m_caCert.clear();
             WiFiClientSecure::setCACert(nullptr);
-            Serial.println("CA Cert cleared");
         }
-        Serial.println("-WiFiSecureConnection::setCACert");
     }
 
     void WiFiSecureConnection::setClientCert(const char *cert)

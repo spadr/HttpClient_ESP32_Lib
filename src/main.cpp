@@ -1,11 +1,20 @@
+#ifndef PIO_UNIT_TESTING
 #include <Arduino.h>
 #include <WiFi.h>
 #include "HttpClient.h"
+
+// Config.h が存在するかどうかをチェック
+#ifdef CONFIG_H_EXISTS
 #include "Config.h"
+using namespace Config; // Config 名前空間を使う
+#else
+#include "ConfigExample.h"
+using namespace ConfigExample; // ConfigExample 名前空間を使う
+#endif
 
+canaspad::ClientOptions options;
+canaspad::HttpClient *client;
 struct tm timeInfo;
-
-#ifndef PIO_UNIT_TESTING
 
 void setup()
 {
@@ -30,65 +39,42 @@ void setup()
     }
     getLocalTime(&timeInfo);
     Serial.println("\nNTP time synced");
+    Serial.println("Starting HttpClient test...");
 
-    // HttpClient setup
-    canaspad::ClientOptions options;
-    options.followRedirects = true;
-    options.verifySsl = true;
-    options.rootCA = isrg_root_x1;
-    options.clientCert = client_cert;
-    options.clientPrivateKey = client_key;
+    options = canaspad::ClientOptions();
+    options.verifySsl = false;
+    client = new canaspad::HttpClient(options);
 
-    Serial.println("Creating HttpClient");
+    // タイムアウトを設定
+    canaspad::HttpClient::Timeouts timeouts;
+    timeouts.read = std::chrono::seconds(5); // 読み取りタイムアウトを5秒に設定
+    client->setTimeouts(timeouts);
 
-    canaspad::HttpClient client(options);
+    // テスト1: 基本的なGETリクエスト
+    Serial.println("Test 1: Basic GET request");
 
-    Serial.println("HttpClient created");
-
-    Serial.println("CA certificate set");
-
-    // Request setup
     canaspad::Request request;
+    request.setUrl("http://example.com").setMethod(canaspad::Request::Method::GET);
 
-    Serial.println("Creating request");
-    request.setUrl(api_url)
-        .setMethod(canaspad::Request::Method::GET);
-
-    Serial.println("Request created");
-
-    // Send request
-    auto result = client.send(request);
-    Serial.println("Response received");
+    auto result = client->send(request);
 
     if (result.isSuccess())
     {
         const auto &httpResult = result.value();
         Serial.printf("Status code: %d\n", httpResult.statusCode);
-        Serial.printf("Status message: %s\n", httpResult.statusMessage.c_str());
-        Serial.printf("Response body: %s\n", httpResult.body.c_str());
-
-        Serial.println("Headers:");
-        for (const auto &header : httpResult.headers)
-        {
-            Serial.printf("%s: %s\n", header.first.c_str(), header.second.c_str());
-        }
-
-        Serial.println("Cookies:");
-        for (const auto &cookie : httpResult.cookies)
-        {
-            Serial.printf("%s = %s\n", cookie.name.c_str(), cookie.value.c_str());
-        }
+        Serial.printf("Body: %s\n", httpResult.body.c_str());
     }
     else
     {
         const auto &error = result.error();
-        Serial.printf("HTTP Error: %s (Error code: %d)\n", error.message.c_str(), static_cast<int>(error.code));
+        Serial.printf("Error: %d, %s\n", static_cast<int>(error.code), error.message.c_str());
     }
 }
 
 void loop()
 {
-    // Your loop code
+    // ここでは何もしない
     delay(1000);
 }
+
 #endif // PIO_UNIT_TESTING

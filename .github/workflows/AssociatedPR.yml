@@ -1,0 +1,35 @@
+name: Associated PR Report
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    name: PR report
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # for yumemi-inc/associated-pull-requests
+      pull-requests: write # for yumemi-inc/associated-pull-requests and yumemi-inc/comment-pull-request
+    steps:
+      - name: List associated pull request numbers
+        uses: yumemi-inc/associated-pull-requests@v1
+        id: associated-pr
+        with:
+          format: 'markdown'
+      - name: Comment
+        if: steps.associated-pr.outputs.numbers != null
+        uses: yumemi-inc/comment-pull-request@v1
+        with:
+          comment: |
+            ### pull requests merged into this pull request:
+            ${{ steps.associated-pr.outputs.numbers }}
+          previous-comment: 'hide'

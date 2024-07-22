@@ -28,9 +28,22 @@ namespace canaspad
 
         if (m_defaultConnection)
         {
+            // デフォルト接続が設定されている場合は、それを返す前に証明書情報を設定
+            auto wifiSecureConnection = std::static_pointer_cast<WiFiSecureConnection>(m_defaultConnection);
+            if (wifiSecureConnection)
+            {
+                wifiSecureConnection->setVerifySsl(m_options.verifySsl);
+                if (m_options.verifySsl)
+                {
+                    wifiSecureConnection->setCACert(m_options.rootCA.c_str());
+                    wifiSecureConnection->setClientCert(m_options.clientCert.c_str());
+                    wifiSecureConnection->setClientPrivateKey(m_options.clientPrivateKey.c_str());
+                }
+            }
             return m_defaultConnection;
         }
 
+        // 既存の接続プールのロジック
         cleanupIdleConnections();
 
         std::string key = generateConnectionKey(host, port);
@@ -43,7 +56,6 @@ namespace canaspad
 
         if (m_pool.size() >= m_maxConnections)
         {
-            // 最も古い接続を削除
             auto oldestIt = std::min_element(
                 m_pool.begin(), m_pool.end(),
                 [](const auto &a, const auto &b)
@@ -68,7 +80,6 @@ namespace canaspad
         {
             return m_pool.begin()->second.connection;
         }
-
         return nullptr;
     }
 
@@ -135,6 +146,11 @@ namespace canaspad
                                                       int port)
     {
         return host + ":" + std::to_string(port);
+    }
+
+    Connection *ConnectionPool::getDefaultConnection() const
+    {
+        return m_defaultConnection.get();
     }
 
 } // namespace canaspad

@@ -25,6 +25,7 @@ namespace canaspad
 
         std::shared_ptr<Connection> getConnection(const std::string &host, int port);
         std::shared_ptr<Connection> getConnection() const; // 引数なしのメソッドを統合
+        Connection *getDefaultConnection() const;
         void releaseConnection(const std::shared_ptr<Connection> &connection);
         std::shared_ptr<CookieJar> getCookieJar() const;
         void disconnectAll();

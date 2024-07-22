@@ -52,6 +52,7 @@ namespace canaspad
 
     private:
         std::unique_ptr<ConnectionPool> m_connectionPool;
+        std::shared_ptr<Connection> m_mockConnection;
         std::unique_ptr<Auth> m_auth;
         std::unique_ptr<Proxy> m_proxy;
         Timeouts m_timeouts;
@@ -59,7 +60,6 @@ namespace canaspad
         ClientOptions m_options;
         std::function<void(size_t, size_t)> m_progressCallback;
         std::function<void(const char *, size_t)> m_responseBodyCallback;
-        std::shared_ptr<Connection> m_mockConnection;
         bool m_useMock = false;
 
         bool m_isInitialized = true;

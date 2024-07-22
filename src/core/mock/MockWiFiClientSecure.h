@@ -2,12 +2,12 @@
 
 #include "../Connection.h"
 #include "CommunicationLog.h"
-#include "ResponseInjector.h"
+#include "../CommonTypes.h"
 
 #include <vector>
 #include <queue>
 #include <string>
-#include <memory>
+#include <chrono>
 
 namespace canaspad
 {
@@ -17,11 +17,20 @@ namespace canaspad
     private:
         bool m_connected;
         CommunicationLog m_log;
-        ResponseInjector m_injector;
+        std::queue<std::vector<uint8_t>> m_responseQueue;
         std::vector<uint8_t> m_receiveBuffer;
+        std::chrono::steady_clock::time_point m_operationStart;
+        std::chrono::milliseconds m_readTimeout{0};
+        bool m_simulateTimeout{false};
+
+        // SSL 関連の設定を保持する変数
+        bool m_verifySsl;
+        std::string m_caCert;
+        std::string m_clientCert;
+        std::string m_clientPrivateKey;
 
     public:
-        MockWiFiClientSecure() : m_connected(false) {}
+        MockWiFiClientSecure(const ClientOptions &options);
 
         bool connect(const std::string &host, int port) override;
         void disconnect() override;
@@ -45,6 +54,14 @@ namespace canaspad
         // テスト用メソッド
         void injectResponse(const std::vector<uint8_t> &response);
         const CommunicationLog &getCommunicationLog() const;
+        void simulateTimeout(bool simulate);
+        void setOptions(const ClientOptions &options);
+
+        // SSL 設定を確認するためのGetter メソッド
+        bool getVerifySsl() const;
+        const std::string &getCACert() const;
+        const std::string &getClientCert() const;
+        const std::string &getClientPrivateKey() const;
     };
 
 } // namespace canaspad

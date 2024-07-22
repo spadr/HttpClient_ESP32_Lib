@@ -14,7 +14,7 @@ namespace canaspad
     HttpClient::HttpClient(const ClientOptions &options, bool useMock)
         : m_connectionPool(std::make_unique<ConnectionPool>(
               options,
-              useMock ? std::shared_ptr<Connection>(new MockWiFiClientSecure())
+              useMock ? std::shared_ptr<Connection>(new MockWiFiClientSecure(options))
                       : std::shared_ptr<Connection>(new WiFiSecureConnection()))),
           m_auth(std::make_unique<Auth>(options)),
           m_proxy(std::make_unique<Proxy>(options)),
@@ -25,16 +25,21 @@ namespace canaspad
     {
         if (useMock)
         {
-            m_mockConnection = std::static_pointer_cast<MockWiFiClientSecure>(m_connectionPool->getConnection());
+            m_mockConnection = std::make_shared<MockWiFiClientSecure>(options);
         }
-        time_t now;
-        time(&now);
-        if (now < 3600 * 9)
+        else
         {
-            m_isInitialized = false;
-            m_initializationError = (ErrorInfo(
-                ErrorCode::TimeNotSet,
-                "System time is not set. Please synchronize with NTP server."));
+            m_connectionPool = std::make_unique<ConnectionPool>(options);
+
+            time_t now;
+            time(&now);
+            if (now < 3600 * 9)
+            {
+                m_isInitialized = false;
+                m_initializationError = (ErrorInfo(
+                    ErrorCode::TimeNotSet,
+                    "System time is not set. Please synchronize with NTP server."));
+            }
         }
     }
 
@@ -42,12 +47,11 @@ namespace canaspad
 
     Connection *HttpClient::getConnection() const
     {
-        auto connection = m_connectionPool->getConnection();
         if (m_useMock)
         {
-            return static_cast<MockWiFiClientSecure *>(connection.get());
+            return m_mockConnection.get();
         }
-        return connection.get();
+        return m_connectionPool->getDefaultConnection();
     }
 
     bool HttpClient::checkTimeout(const std::chrono::steady_clock::time_point &start,
