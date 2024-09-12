@@ -205,7 +205,7 @@ namespace canaspad
         }
     }
 
-    void Utils::parseCookie(const std::string &setCookieHeader, Cookie &cookie)
+    void Utils::parseCookie(const std::string &setCookieHeader, Cookie &cookie, const std::string &requestUrl)
     {
         std::istringstream iss(setCookieHeader);
         std::string token;
@@ -234,6 +234,20 @@ namespace canaspad
             {
                 cookie.httpOnly = true;
             }
+            else if (token.substr(0, 7) == "Expires=")
+            {
+                // Expires 属性の処理
+                std::tm tm = {};
+                std::istringstream ss(token.substr(8));
+                ss >> std::get_time(&tm, "%a, %d %b %Y %H:%M:%S %Z");
+                cookie.expires = std::mktime(&tm);
+            }
+        }
+
+        // Domain 属性が指定されていない場合、リクエストURLのホスト部分を設定
+        if (cookie.domain.empty())
+        {
+            cookie.domain = Utils::extractHost(requestUrl);
         }
     }
 

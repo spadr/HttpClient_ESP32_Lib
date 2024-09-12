@@ -161,7 +161,7 @@ namespace canaspad
             for (const auto &setCookieHeader : Utils::extractHeaders(httpResult.headers, "Set-Cookie"))
             {
                 Cookie cookie;
-                Utils::parseCookie(setCookieHeader, cookie);
+                Utils::parseCookie(setCookieHeader, cookie, modifiedRequest.getUrl());
                 httpResult.cookies.push_back(cookie);
                 m_connectionPool->getCookieJar()->setCookie(modifiedRequest.getUrl(), setCookieHeader);
             }

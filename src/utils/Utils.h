@@ -22,7 +22,7 @@ namespace canaspad
         static std::string generateBoundary();
         static void parseStatusLine(const std::string &statusLine, HttpResult &result);
         static void parseHeader(const std::string &headerLine, HttpResult &result);
-        static void parseCookie(const std::string &setCookieHeader, Cookie &cookie);
+        static void parseCookie(const std::string &setCookieHeader, Cookie &cookie, const std::string &requestUrl);
         static std::string extractHeaderValue(const std::unordered_map<std::string, std::string> &headers, const std::string &key);
         static std::vector<std::string> extractHeaders(const std::unordered_map<std::string, std::string> &headers, const std::string &key);
         static size_t extractContentLength(const std::unordered_map<std::string, std::string> &headers);

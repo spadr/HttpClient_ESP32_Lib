@@ -15,6 +15,7 @@ namespace canaspad
 
     private:
         std::unordered_map<std::string, std::vector<Cookie>> m_cookies;
+        void cleanupExpiredCookies();
     };
 
 } // namespace canaspad
