@@ -12,22 +12,45 @@
 namespace canaspad
 {
 
+    enum class ConnectBehavior
+    {
+        AlwaysSuccess,
+        AlwaysFail,
+        FailNTimesThenSuccess,
+    };
+
+    enum class ReadBehavior
+    {
+        Normal,
+        SlowResponse,
+        DropConnection,
+        Timeout
+    };
+
     class MockWiFiClientSecure : public Connection
     {
     private:
+        ClientOptions m_options;
         bool m_connected;
         CommunicationLog m_log;
         std::queue<std::vector<uint8_t>> m_responseQueue;
         std::vector<uint8_t> m_receiveBuffer;
         std::chrono::steady_clock::time_point m_operationStart;
         std::chrono::milliseconds m_readTimeout{0};
-        bool m_simulateTimeout{false};
 
         // SSL 関連の設定を保持する変数
         bool m_verifySsl;
         std::string m_caCert;
         std::string m_clientCert;
         std::string m_clientPrivateKey;
+
+        // 接続シナリオ
+        ConnectBehavior m_connectBehavior{ConnectBehavior::AlwaysSuccess}; // デフォルトは必ず成功
+        int m_failCount{0};                                                // FailNTimesThenSuccess の場合の失敗回数
+
+        // 読み込みシナリオ
+        ReadBehavior m_readBehavior{ReadBehavior::Normal}; // デフォルトは正常
+        std::chrono::milliseconds m_slowResponseDelay{0};  // SlowResponse の場合の遅延時間
 
     public:
         MockWiFiClientSecure(const ClientOptions &options);
@@ -54,8 +77,9 @@ namespace canaspad
         // テスト用メソッド
         void injectResponse(const std::vector<uint8_t> &response);
         const CommunicationLog &getCommunicationLog() const;
-        void simulateTimeout(bool simulate);
         void setOptions(const ClientOptions &options);
+        void setConnectBehavior(ConnectBehavior behavior, int failCount = 0);
+        void setReadBehavior(ReadBehavior behavior, std::chrono::milliseconds delay = std::chrono::milliseconds(0));
 
         // SSL 設定を確認するためのGetter メソッド
         bool getVerifySsl() const;

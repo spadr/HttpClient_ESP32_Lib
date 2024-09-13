@@ -72,26 +72,28 @@ namespace canaspad
     Result<HttpResult> HttpClient::sendWithRetries(const Request &request, int retryCount)
     {
         auto result = sendWithRedirects(request);
+
         if (result.isError())
         {
             const auto &error = result.error();
-            if ((error.code == ErrorCode::NetworkError || error.code == ErrorCode::Timeout) && retryCount < m_options.maxRetries)
+
+            // Timeout の場合もリトライ対象に含める
+            if ((error.code == ErrorCode::NetworkError || error.code == ErrorCode::Timeout) &&
+                retryCount < m_options.maxRetries)
             {
+
+                // リトライ前に遅延を追加
                 std::this_thread::sleep_for(m_options.retryDelay);
+
                 return sendWithRetries(request, retryCount + 1);
             }
         }
-        else if (result.value().statusCode >= 500 && retryCount < m_options.maxRetries)
-        {
-            std::this_thread::sleep_for(m_options.retryDelay);
-            return sendWithRetries(request, retryCount + 1);
-        }
+
         return result;
     }
 
     Result<HttpResult> HttpClient::sendWithRedirects(const Request &request, int redirectCount)
     {
-
         auto modifiedRequest = request;
 
         // 認証情報を適用

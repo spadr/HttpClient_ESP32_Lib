@@ -1,5 +1,5 @@
 #include "MockWiFiClientSecure.h"
-
+#include <thread>
 #include <algorithm>
 
 namespace canaspad
@@ -11,7 +11,8 @@ namespace canaspad
           m_verifySsl(options.verifySsl),
           m_caCert(options.rootCA),
           m_clientCert(options.clientCert),
-          m_clientPrivateKey(options.clientPrivateKey)
+          m_clientPrivateKey(options.clientPrivateKey),
+          m_options(options)
     {
     }
 
@@ -26,8 +27,37 @@ namespace canaspad
 
     bool MockWiFiClientSecure::connect(const std::string &host, int port)
     {
-        m_connected = true;
-        return true;
+        switch (m_connectBehavior)
+        {
+        case ConnectBehavior::AlwaysSuccess:
+            m_connected = true;
+            return true;
+
+        case ConnectBehavior::AlwaysFail:
+            return false;
+
+        case ConnectBehavior::FailNTimesThenSuccess:
+            if (m_failCount > 0)
+            {
+                m_failCount--;
+                return false;
+            }
+            else
+            {
+                m_connected = true;
+                return true;
+            }
+
+        default:
+            m_connected = true;
+            return true;
+        }
+    }
+
+    void MockWiFiClientSecure::setConnectBehavior(ConnectBehavior behavior, int failCount)
+    {
+        m_connectBehavior = behavior;
+        m_failCount = failCount;
     }
 
     void MockWiFiClientSecure::disconnect() { m_connected = false; }
@@ -42,12 +72,32 @@ namespace canaspad
 
     int MockWiFiClientSecure::read(uint8_t *buf, size_t size)
     {
-        if (m_simulateTimeout &&
+        // タイムアウトシミュレーション
+        if (m_readBehavior == ReadBehavior::Timeout &&
             std::chrono::steady_clock::now() - m_operationStart > m_readTimeout)
         {
             return 0; // タイムアウトをシミュレート
         }
 
+        // 読み込みシナリオに基づいて動作
+        switch (m_readBehavior)
+        {
+        case ReadBehavior::Normal:
+            break; // 通常の動作
+
+        case ReadBehavior::SlowResponse:
+            std::this_thread::sleep_for(m_slowResponseDelay);
+            break;
+
+        case ReadBehavior::DropConnection:
+            m_connected = false; // 接続を切断
+            return 0;
+
+        default:
+            break;
+        }
+
+        // 通常の read 処理 (データの読み込み)
         size_t readSize = std::min(size, m_receiveBuffer.size());
         std::copy(m_receiveBuffer.begin(), m_receiveBuffer.begin() + readSize, buf);
         m_receiveBuffer.erase(m_receiveBuffer.begin(), m_receiveBuffer.begin() + readSize);
@@ -62,6 +112,12 @@ namespace canaspad
         return readSize;
     }
 
+    void MockWiFiClientSecure::setReadBehavior(ReadBehavior behavior, std::chrono::milliseconds delay)
+    {
+        m_readBehavior = behavior;
+        m_slowResponseDelay = delay;
+    }
+
     int MockWiFiClientSecure::setTimeout(uint32_t seconds)
     {
         m_readTimeout = std::chrono::seconds(seconds);
@@ -73,7 +129,10 @@ namespace canaspad
         const std::chrono::milliseconds &readTimeout,
         const std::chrono::milliseconds &writeTimeout)
     {
+
         m_readTimeout = readTimeout;
+
+        // 常に m_operationStart を更新
         m_operationStart = std::chrono::steady_clock::now();
     }
 
@@ -172,11 +231,6 @@ namespace canaspad
     const CommunicationLog &MockWiFiClientSecure::getCommunicationLog() const
     {
         return m_log;
-    }
-
-    void MockWiFiClientSecure::simulateTimeout(bool simulate)
-    {
-        m_simulateTimeout = simulate;
     }
 
 } // namespace canaspad
