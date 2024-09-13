@@ -1,6 +1,7 @@
 #include "HttpMethodTest.h"
 #include "SslConnectionTest.h"
 #include "CookieTest.h"
+#include "RedirectTest.h"
 
 void setUp(void)
 {
@@ -19,6 +20,7 @@ void runUnityTests()
     run_http_method_tests();
     run_ssl_connection_tests();
     run_cookie_tests();
+    run_redirect_tests();
 
     UNITY_END();
 }
