@@ -27,6 +27,14 @@ namespace canaspad
         Timeout
     };
 
+    enum class WriteBehavior
+    {
+        Normal,
+        SlowResponse,
+        DropConnection,
+        Timeout
+    };
+
     class MockWiFiClientSecure : public Connection
     {
     private:
@@ -52,6 +60,10 @@ namespace canaspad
         ReadBehavior m_readBehavior{ReadBehavior::Normal}; // デフォルトは正常
         std::chrono::milliseconds m_slowResponseDelay{0};  // SlowResponse の場合の遅延時間
 
+        // 書き込みシナリオ
+        WriteBehavior m_writeBehavior{WriteBehavior::Normal}; // デフォルトは正常
+        std::chrono::milliseconds m_writeDelay{0};            // 書き込み遅延時間
+
     public:
         MockWiFiClientSecure(const ClientOptions &options);
 
@@ -60,10 +72,10 @@ namespace canaspad
         bool isConnected() const override;
         size_t write(const uint8_t *buf, size_t size) override;
         int read(uint8_t *buf, size_t size) override;
-        int setTimeout(uint32_t seconds) override;
+        int setTimeout(uint32_t seconds) override; // Deprecated
         void setTimeouts(const std::chrono::milliseconds &connectTimeout,
                          const std::chrono::milliseconds &readTimeout,
-                         const std::chrono::milliseconds &writeTimeout) override;
+                         const std::chrono::milliseconds &writeTimeout) override; // Deprecated
         std::string readLine() override;
         std::string read(size_t size) override;
         void setVerifySsl(bool verify) override;
@@ -80,6 +92,7 @@ namespace canaspad
         void setOptions(const ClientOptions &options);
         void setConnectBehavior(ConnectBehavior behavior, int failCount = 0);
         void setReadBehavior(ReadBehavior behavior, std::chrono::milliseconds delay = std::chrono::milliseconds(0));
+        void setWriteBehavior(WriteBehavior behavior, std::chrono::milliseconds delay = std::chrono::milliseconds(0));
 
         // SSL 設定を確認するためのGetter メソッド
         bool getVerifySsl() const;

@@ -33,6 +33,7 @@ void test_ssl_certificate_configuration()
     TEST_ASSERT_TRUE(mockClient->getClientCert().empty());
     TEST_ASSERT_TRUE(mockClient->getClientPrivateKey().empty());
     TEST_ASSERT_EQUAL_STRING(TEST_ROOT_CA, mockClient->getCACert().c_str());
+    delete client;
 }
 
 void test_https_connection()
@@ -57,6 +58,7 @@ void test_https_connection()
     TEST_ASSERT_TRUE(result.isSuccess());
     TEST_ASSERT_EQUAL_INT(200, result.value().statusCode);
     TEST_ASSERT_EQUAL_STRING("Hello, World!", result.value().body.c_str());
+    delete client;
 }
 
 void test_client_certificate_authentication()
@@ -86,6 +88,7 @@ void test_client_certificate_authentication()
     TEST_ASSERT_TRUE(result.isSuccess());
     TEST_ASSERT_EQUAL_INT(200, result.value().statusCode);
     TEST_ASSERT_EQUAL_STRING("Hello, Client!", result.value().body.c_str());
+    delete client;
 }
 
 void run_ssl_connection_tests(void)

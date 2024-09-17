@@ -66,8 +66,39 @@ namespace canaspad
 
     size_t MockWiFiClientSecure::write(const uint8_t *buf, size_t size)
     {
+        // タイムアウトシミュレーション
+        if (m_writeBehavior == WriteBehavior::Timeout &&
+            std::chrono::steady_clock::now() - m_operationStart > m_writeDelay)
+        {
+            return 0; // タイムアウトをシミュレート
+        }
+
+        // 書き込みシナリオに基づいて動作
+        switch (m_writeBehavior)
+        {
+        case WriteBehavior::Normal:
+            break; // 通常の動作
+
+        case WriteBehavior::SlowResponse:
+            std::this_thread::sleep_for(m_writeDelay);
+            break;
+
+        case WriteBehavior::DropConnection:
+            m_connected = false; // 接続を切断
+            return 0;
+
+        default:
+            break;
+        }
+
         m_log.addSent(buf, size);
         return size;
+    }
+
+    void MockWiFiClientSecure::setWriteBehavior(WriteBehavior behavior, std::chrono::milliseconds delay)
+    {
+        m_writeBehavior = behavior;
+        m_writeDelay = delay;
     }
 
     int MockWiFiClientSecure::read(uint8_t *buf, size_t size)

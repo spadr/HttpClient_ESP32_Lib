@@ -3,6 +3,7 @@
 #include "CookieTest.h"
 #include "RedirectTest.h"
 #include "RetryTest.h"
+#include "TimeoutTest.h"
 
 void setUp(void)
 {
@@ -23,6 +24,7 @@ void runUnityTests()
     run_cookie_tests();
     run_redirect_tests();
     run_retry_tests();
+    run_timeout_tests();
 
     UNITY_END();
 }

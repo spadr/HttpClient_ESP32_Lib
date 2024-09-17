@@ -28,9 +28,9 @@ namespace canaspad
 
         struct Timeouts
         {
-            std::chrono::milliseconds connect{30000};
-            std::chrono::milliseconds read{30000};
-            std::chrono::milliseconds write{30000};
+            std::chrono::milliseconds connect{5000};
+            std::chrono::milliseconds read{5000};
+            std::chrono::milliseconds write{5000};
         };
 
         void setTimeouts(const Timeouts &timeouts);
