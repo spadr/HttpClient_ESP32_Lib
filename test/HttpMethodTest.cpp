@@ -20,6 +20,7 @@ void test_get_method(void)
     TEST_ASSERT_TRUE(getResult.isSuccess());
     TEST_ASSERT_EQUAL_INT(200, getResult.value().statusCode);
     TEST_ASSERT_EQUAL_STRING("Hello, World!", getResult.value().body.c_str());
+    delete client;
 }
 
 void test_post_method(void)
@@ -42,6 +43,7 @@ void test_post_method(void)
     auto postResult = client->send(postRequest);
     TEST_ASSERT_TRUE(postResult.isSuccess());
     TEST_ASSERT_EQUAL_INT(201, postResult.value().statusCode);
+    delete client;
 }
 
 void test_put_method(void)
@@ -64,6 +66,7 @@ void test_put_method(void)
     auto putResult = client->send(putRequest);
     TEST_ASSERT_TRUE(putResult.isSuccess());
     TEST_ASSERT_EQUAL_INT(200, putResult.value().statusCode);
+    delete client;
 }
 
 void test_delete_method(void)
@@ -85,6 +88,7 @@ void test_delete_method(void)
     auto deleteResult = client->send(deleteRequest);
     TEST_ASSERT_TRUE(deleteResult.isSuccess());
     TEST_ASSERT_EQUAL_INT(204, deleteResult.value().statusCode);
+    delete client;
 }
 
 void test_patch_method(void)
@@ -107,6 +111,7 @@ void test_patch_method(void)
     auto patchResult = client->send(patchRequest);
     TEST_ASSERT_TRUE(patchResult.isSuccess());
     TEST_ASSERT_EQUAL_INT(200, patchResult.value().statusCode);
+    delete client;
 }
 
 void test_head_method(void)
@@ -129,6 +134,7 @@ void test_head_method(void)
     TEST_ASSERT_TRUE(headResult.isSuccess());
     TEST_ASSERT_EQUAL_INT(200, headResult.value().statusCode);
     TEST_ASSERT_EQUAL_STRING("", headResult.value().body.c_str());
+    delete client;
 }
 
 void test_options_method(void)
@@ -154,6 +160,7 @@ void test_options_method(void)
     auto allowIt = optionsResult.value().headers.find("Allow");
     TEST_ASSERT_TRUE(allowIt != optionsResult.value().headers.end());
     TEST_ASSERT_EQUAL_STRING("GET, POST, HEAD, OPTIONS", allowIt->second.c_str());
+    delete client;
 }
 
 void run_http_method_tests(void)

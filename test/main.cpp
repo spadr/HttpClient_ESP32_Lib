@@ -1,6 +1,9 @@
 #include "HttpMethodTest.h"
 #include "SslConnectionTest.h"
-
+#include "CookieTest.h"
+#include "RedirectTest.h"
+#include "RetryTest.h"
+#include "TimeoutTest.h"
 
 void setUp(void)
 {
@@ -18,6 +21,10 @@ void runUnityTests()
 
     run_http_method_tests();
     run_ssl_connection_tests();
+    run_cookie_tests();
+    run_redirect_tests();
+    run_retry_tests();
+    run_timeout_tests();
 
     UNITY_END();
 }
@@ -25,10 +32,10 @@ void runUnityTests()
 void setup()
 {
     delay(2000);
-    runUnityTests();
 }
 
 void loop()
 {
-    // テストが終了したら何もしない
+    runUnityTests(); // loop() 関数内でテストを実行
+    delay(1000);     // テスト終了後、1秒待機 (任意)
 }

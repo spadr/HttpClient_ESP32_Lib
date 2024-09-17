@@ -11,30 +11,68 @@ namespace canaspad
     void CookieJar::setCookie(const std::string &url, const std::string &setCookieHeader)
     {
         Cookie cookie;
-        Utils::parseCookie(setCookieHeader, cookie);
-        m_cookies[Utils::extractBaseUrl(url)].push_back(cookie);
+        Utils::parseCookie(setCookieHeader, cookie, url); // リクエストURLを渡す
+
+        // クッキーをドメイン単位で保存
+        m_cookies[cookie.domain].push_back(cookie);
+
+        // setCookie 内で有効期限切れのクッキーを削除 (例)
+        cleanupExpiredCookies();
     }
 
     std::vector<std::string> CookieJar::getCookiesForUrl(const std::string &url) const
     {
         std::vector<std::string> result;
         time_t now = time(nullptr);
+        std::string domain = Utils::extractHost(url); // URLからドメインを取得
 
-        for (const auto &pair : m_cookies)
+        // ドメインに一致するクッキーを取得
+        auto it = m_cookies.find(domain);
+        if (it != m_cookies.end())
         {
-            if (url.find(pair.first) != std::string::npos)
+            for (const auto &cookie : it->second)
             {
-                for (const auto &cookie : pair.second)
+                if (cookie.expires == 0 || cookie.expires >= now)
                 {
-                    // 有効期限が設定されていて、現在時刻より前の場合はスキップ
-                    if (cookie.expires != 0 && cookie.expires < now)
-                    {
-                        continue;
-                    }
                     result.push_back(cookie.name + "=" + cookie.value);
                 }
             }
         }
+
         return result;
     }
+
+    // 有効期限切れのクッキーを削除する
+    void CookieJar::cleanupExpiredCookies()
+    {
+        time_t now = time(nullptr);
+        for (auto it = m_cookies.begin(); it != m_cookies.end();)
+        {
+            bool allExpired = true;
+            for (auto cookieIt = it->second.begin(); cookieIt != it->second.end();)
+            {
+                if (cookieIt->expires != 0 && cookieIt->expires < now)
+                {
+                    // 有効期限切れのクッキーを削除
+                    cookieIt = it->second.erase(cookieIt);
+                }
+                else
+                {
+                    allExpired = false;
+                    ++cookieIt;
+                }
+            }
+
+            // 全てのクッキーが有効期限切れの場合、エントリ自体を削除
+            if (allExpired)
+            {
+                it = m_cookies.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
+
 } // namespace canaspad

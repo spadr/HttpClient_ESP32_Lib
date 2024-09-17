@@ -72,26 +72,28 @@ namespace canaspad
     Result<HttpResult> HttpClient::sendWithRetries(const Request &request, int retryCount)
     {
         auto result = sendWithRedirects(request);
+
         if (result.isError())
         {
             const auto &error = result.error();
-            if ((error.code == ErrorCode::NetworkError || error.code == ErrorCode::Timeout) && retryCount < m_options.maxRetries)
+
+            // Timeout の場合もリトライ対象に含める
+            if ((error.code == ErrorCode::NetworkError || error.code == ErrorCode::Timeout) &&
+                retryCount < m_options.maxRetries)
             {
+
+                // リトライ前に遅延を追加
                 std::this_thread::sleep_for(m_options.retryDelay);
+
                 return sendWithRetries(request, retryCount + 1);
             }
         }
-        else if (result.value().statusCode >= 500 && retryCount < m_options.maxRetries)
-        {
-            std::this_thread::sleep_for(m_options.retryDelay);
-            return sendWithRetries(request, retryCount + 1);
-        }
+
         return result;
     }
 
     Result<HttpResult> HttpClient::sendWithRedirects(const Request &request, int redirectCount)
     {
-
         auto modifiedRequest = request;
 
         // 認証情報を適用
@@ -161,30 +163,34 @@ namespace canaspad
             for (const auto &setCookieHeader : Utils::extractHeaders(httpResult.headers, "Set-Cookie"))
             {
                 Cookie cookie;
-                Utils::parseCookie(setCookieHeader, cookie);
+                Utils::parseCookie(setCookieHeader, cookie, modifiedRequest.getUrl());
                 httpResult.cookies.push_back(cookie);
                 m_connectionPool->getCookieJar()->setCookie(modifiedRequest.getUrl(), setCookieHeader);
             }
         }
 
         // リダイレクト処理
-        if (m_options.followRedirects && redirectCount < m_options.maxRedirects)
+        // まずリダイレクト回数が最大を超えているかを確認する
+        if (redirectCount >= m_options.maxRedirects)
         {
-            if (httpResult.statusCode >= 300 && httpResult.statusCode < 400)
+            // リダイレクト回数が最大を超えた場合、エラーを返す
+            return Result<HttpResult>(ErrorInfo(ErrorCode::TooManyRedirects, "Too many redirects"));
+        }
+        else if (m_options.followRedirects && httpResult.statusCode >= 300 && httpResult.statusCode < 400)
+        {
+            // リダイレクト回数が最大を超えておらず、followRedirects が true の場合、リダイレクト処理を行う
+            auto location = Utils::extractHeaderValue(httpResult.headers, "Location");
+            if (!location.empty())
             {
-                auto location = Utils::extractHeaderValue(httpResult.headers, "Location");
-                if (!location.empty())
+                if (location.find("://") == std::string::npos)
                 {
-                    if (location.find("://") == std::string::npos)
-                    {
-                        std::string baseUrl = Utils::extractBaseUrl(modifiedRequest.getUrl());
-                        location = baseUrl + location;
-                    }
-
-                    Request redirectRequest = modifiedRequest;
-                    redirectRequest.setUrl(location);
-                    return sendWithRedirects(redirectRequest, redirectCount + 1);
+                    std::string baseUrl = Utils::extractBaseUrl(modifiedRequest.getUrl());
+                    location = baseUrl + location;
                 }
+
+                Request redirectRequest = modifiedRequest;
+                redirectRequest.setUrl(location);
+                return sendWithRedirects(redirectRequest, redirectCount + 1);
             }
         }
 
