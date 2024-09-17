@@ -12,8 +12,6 @@ using namespace Config; // Config 名前空間を使う
 using namespace ConfigExample; // ConfigExample 名前空間を使う
 #endif
 
-canaspad::ClientOptions options;
-canaspad::HttpClient *client;
 struct tm timeInfo;
 
 void setup()
@@ -41,14 +39,14 @@ void setup()
     Serial.println("\nNTP time synced");
     Serial.println("Starting HttpClient test...");
 
-    options = canaspad::ClientOptions();
+    canaspad::ClientOptions options;
     options.verifySsl = false;
-    client = new canaspad::HttpClient(options);
+    canaspad::HttpClient client(options);
 
     // タイムアウトを設定
     canaspad::HttpClient::Timeouts timeouts;
     timeouts.read = std::chrono::seconds(5); // 読み取りタイムアウトを5秒に設定
-    client->setTimeouts(timeouts);
+    client.setTimeouts(timeouts);
 
     // テスト1: 基本的なGETリクエスト
     Serial.println("Test 1: Basic GET request");
@@ -56,7 +54,7 @@ void setup()
     canaspad::Request request;
     request.setUrl("http://example.com").setMethod(canaspad::Request::Method::GET);
 
-    auto result = client->send(request);
+    auto result = client.send(request);
 
     if (result.isSuccess())
     {
