@@ -19,6 +19,13 @@ namespace canaspad
         RequestCancelled,
         TimeNotSet,
         UnsupportedOperation,
+        ProxyAuthenticationRequired,
+        MissingHeader,
+        InvalidHeader,
+        DuplicateHeader,
+        InvalidBody,
+        InvalidOption,
+        InvalidProxyURL
     };
 
     struct ErrorInfo
@@ -39,72 +46,57 @@ namespace canaspad
         Result(T &&value) : m_data(std::move(value)) {}
         Result(const T &value) : m_data(value) {}
         Result(ErrorInfo &&error) : m_data(std::move(error)) {}
+        Result(const ErrorInfo &error) : m_data(error) {}
+
+        // コピーコンストラクタ
+        Result(const Result &other) : m_data(other.m_data) {}
+        // ムーブ代入演算子
+        Result &operator=(Result &&other) noexcept
+        {
+            if (this != &other)
+            {
+                m_data = std::move(other.m_data);
+            }
+            return *this;
+        }
 
         bool isSuccess() const { return std::holds_alternative<T>(m_data); }
         bool isError() const { return std::holds_alternative<ErrorInfo>(m_data); }
 
+        // value() は T 型の Result でのみ使用されるため、特殊化しない
         const T &value() const & { return std::get<T>(m_data); }
         T &&value() && { return std::move(std::get<T>(m_data)); }
 
         const ErrorInfo &error() const { return std::get<ErrorInfo>(m_data); }
+    };
 
-        template <typename F>
-        auto and_then(F &&f) const & -> Result<std::invoke_result_t<F, const T &>>
+    // void 型の特殊化
+    template <>
+    class Result<void>
+    {
+        std::variant<std::monostate, ErrorInfo> m_data;
+
+    public:
+        Result() : m_data(std::monostate{}) {} // 成功時のコンストラクタ
+        Result(ErrorInfo &&error) : m_data(std::move(error)) {}
+        Result(const ErrorInfo &error) : m_data(error) {}
+
+        // コピーコンストラクタ
+        Result(const Result &other) : m_data(other.m_data) {}
+        // ムーブ代入演算子
+        Result &operator=(Result &&other) noexcept
         {
-            if (isSuccess())
+            if (this != &other)
             {
-                return f(value());
+                m_data = std::move(other.m_data);
             }
-            return Result<std::invoke_result_t<F, const T &>>(error());
+            return *this;
         }
 
-        template <typename F>
-        auto and_then(F &&f) && -> Result<std::invoke_result_t<F, T &&>>
-        {
-            if (isSuccess())
-            {
-                return f(std::move(*this).value());
-            }
-            return Result<std::invoke_result_t<F, T &&>>(std::move(*this).error());
-        }
+        bool isSuccess() const { return std::holds_alternative<std::monostate>(m_data); }
+        bool isError() const { return std::holds_alternative<ErrorInfo>(m_data); }
 
-        template <typename F>
-        auto map(F &&f) const & -> Result<std::invoke_result_t<F, const T &>>
-        {
-            if (isSuccess())
-            {
-                return Result<std::invoke_result_t<F, const T &>>(f(value()));
-            }
-            return Result<std::invoke_result_t<F, const T &>>(error());
-        }
-
-        template <typename F>
-        auto map(F &&f) && -> Result<std::invoke_result_t<F, T &&>>
-        {
-            if (isSuccess())
-            {
-                return Result<std::invoke_result_t<F, T &&>>(f(std::move(*this).value()));
-            }
-            return Result<std::invoke_result_t<F, T &&>>(std::move(*this).error());
-        }
-
-        T value_or(T &&default_value) const &
-        {
-            if (isSuccess())
-            {
-                return value();
-            }
-            return std::forward<T>(default_value);
-        }
-
-        T value_or(T &&default_value) &&
-        {
-            if (isSuccess())
-            {
-                return std::move(*this).value();
-            }
-            return std::forward<T>(default_value);
-        }
+        const ErrorInfo &error() const { return std::get<ErrorInfo>(m_data); }
     };
 
 } // namespace canaspad

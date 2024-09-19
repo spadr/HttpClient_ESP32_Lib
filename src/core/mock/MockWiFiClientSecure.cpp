@@ -92,6 +92,7 @@ namespace canaspad
         }
 
         m_log.addSent(buf, size);
+
         return size;
     }
 
@@ -132,8 +133,8 @@ namespace canaspad
         size_t readSize = std::min(size, m_receiveBuffer.size());
         std::copy(m_receiveBuffer.begin(), m_receiveBuffer.begin() + readSize, buf);
         m_receiveBuffer.erase(m_receiveBuffer.begin(), m_receiveBuffer.begin() + readSize);
-        m_log.addReceived(buf, readSize);
 
+        // receiveBuffer が空になったら、キューから次のレスポンスを読み込む
         if (m_receiveBuffer.empty() && !m_responseQueue.empty())
         {
             m_receiveBuffer = m_responseQueue.front();
@@ -170,15 +171,22 @@ namespace canaspad
     std::string MockWiFiClientSecure::readLine()
     {
         std::string line;
-        while (available() > 0)
+
+        // m_receiveBuffer から \n を探す
+        auto newlinePos = std::find(m_receiveBuffer.begin(), m_receiveBuffer.end(), '\n');
+
+        if (newlinePos != m_receiveBuffer.end())
         {
-            char c = read();
-            line += c;
-            if (c == '\n')
-            {
-                break;
-            }
+            // \n が見つかった場合、行全体を line にコピー
+            line = std::string(m_receiveBuffer.begin(), newlinePos + 1);
+
+            // 1行読み込んだらログに追加
+            m_log.addReceived(reinterpret_cast<const uint8_t *>(line.c_str()), line.size());
+
+            // m_receiveBuffer から読み込んだ行を削除
+            m_receiveBuffer.erase(m_receiveBuffer.begin(), newlinePos + 1);
         }
+
         return line;
     }
 
@@ -251,7 +259,10 @@ namespace canaspad
 
     void MockWiFiClientSecure::injectResponse(const std::vector<uint8_t> &response)
     {
+        // 新しいレスポンスをキューに追加
         m_responseQueue.push(response);
+
+        // 現在の receiveBuffer が空の場合、キューの先頭からレスポンスを receiveBuffer に移動
         if (m_receiveBuffer.empty() && !m_responseQueue.empty())
         {
             m_receiveBuffer = m_responseQueue.front();

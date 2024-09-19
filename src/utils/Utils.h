@@ -12,7 +12,7 @@ namespace canaspad
     class Utils
     {
     public:
-        static std::string methodToString(Request::Method method);
+        static std::string extractScheme(const std::string &url);
         static std::string extractHost(const std::string &url);
         static int extractPort(const std::string &url);
         static std::string extractPath(const std::string &url);

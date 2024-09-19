@@ -25,7 +25,7 @@ void test_http_client_redirect_handling()
 
     // 最初のGETリクエスト
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://example.com").setMethod(canaspad::HttpMethod::GET);
     auto result = client.send(request);
 
     // リダイレクトを追跡し、最終的なレスポンスが取得できていることを確認
@@ -51,7 +51,7 @@ void test_http_client_disable_redirect_following()
 
     // 最初のGETリクエスト
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://example.com").setMethod(canaspad::HttpMethod::GET);
     auto result = client.send(request);
 
     // リダイレクトを追跡せず、302 Found レスポンスが取得できていることを確認
@@ -79,7 +79,7 @@ void test_http_client_too_many_redirects()
 
     // 最初のGETリクエスト
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://example.com").setMethod(canaspad::HttpMethod::GET);
     auto result = client.send(request);
 
     // リダイレクト回数が最大を超えたため、エラーが発生することを確認

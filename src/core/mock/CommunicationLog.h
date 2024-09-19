@@ -9,6 +9,12 @@ namespace canaspad
     class CommunicationLog
     {
     public:
+        enum class SourceType
+        {
+            Client,
+            Server
+        };
+
         struct Entry
         {
             enum class Type
@@ -17,6 +23,7 @@ namespace canaspad
                 Received
             };
             Type type;
+            SourceType source; // 送信元を追加
             std::vector<std::uint8_t> data;
         };
 

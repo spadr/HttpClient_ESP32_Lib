@@ -12,10 +12,9 @@
 #include "core/Response.h"
 #include "core/HttpResult.h"
 #include "core/ConnectionPool.h"
-#include "proxy/Proxy.h"
 #include "Result.h"
 #include "auth/Auth.h"
-#include "core/Connection.h" // Connection インターフェースのインクルードを追加
+#include "core/Connection.h"
 
 namespace canaspad
 {
@@ -54,7 +53,6 @@ namespace canaspad
         std::unique_ptr<ConnectionPool> m_connectionPool;
         std::shared_ptr<Connection> m_mockConnection;
         std::unique_ptr<Auth> m_auth;
-        std::unique_ptr<Proxy> m_proxy;
         Timeouts m_timeouts;
         bool m_cookiesEnabled = false;
         ClientOptions m_options;
@@ -69,6 +67,10 @@ namespace canaspad
                           const std::chrono::milliseconds &timeout) const;
         Result<HttpResult> sendWithRedirects(const Request &request, int redirectCount = 0);
         Result<HttpResult> sendWithRetries(const Request &request, int retryCount = 0);
+        Result<std::shared_ptr<Connection>> establishConnection(const Request &request);
+        Result<std::shared_ptr<Connection>> establishDirectConnection(std::shared_ptr<Connection> connection, const std::string &host, int port);
+        Result<std::shared_ptr<Connection>> establishProxyConnection(std::shared_ptr<Connection> connection, const Request &request);
+        Result<std::shared_ptr<Connection>> establishProxyTunnel(std::shared_ptr<Connection> connection, const Request &request, const std::string &proxyHost, int proxyPort);
         Result<HttpResult> readResponse(Connection *connection, const Request &request);
         Result<HttpResult> handleChunkedResponse(Connection *connection, HttpResult &result);
 

@@ -24,7 +24,7 @@ void test_http_client_retry_on_network_error()
     mockClient->injectResponse(std::vector<uint8_t>(successResponse, successResponse + strlen(successResponse)));
 
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://example.com").setMethod(canaspad::HttpMethod::GET);
 
     auto start = std::chrono::high_resolution_clock::now();
     auto result = client.send(request);
@@ -53,7 +53,7 @@ void test_http_client_retry_max_retries_exceeded()
     mockClient->setConnectBehavior(canaspad::ConnectBehavior::AlwaysFail);
 
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://example.com").setMethod(canaspad::HttpMethod::GET);
 
     auto start = std::chrono::high_resolution_clock::now();
     auto result = client.send(request);

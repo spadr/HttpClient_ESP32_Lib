@@ -7,6 +7,7 @@
 #include "../utils/Utils.h"
 #include "WiFiSecureConnection.h"
 #include "mock/MockWiFiClientSecure.h"
+#include "RequestValidator.h"
 
 namespace canaspad
 {
@@ -17,7 +18,6 @@ namespace canaspad
               useMock ? std::shared_ptr<Connection>(new MockWiFiClientSecure(options))
                       : std::shared_ptr<Connection>(new WiFiSecureConnection()))),
           m_auth(std::make_unique<Auth>(options)),
-          m_proxy(std::make_unique<Proxy>(options)),
           m_isInitialized(true),
           m_initializationError(ErrorCode::None, ""),
           m_useMock(useMock),
@@ -66,6 +66,7 @@ namespace canaspad
         {
             return Result<HttpResult>(std::move(m_initializationError));
         }
+
         return sendWithRetries(request);
     }
 
@@ -88,7 +89,6 @@ namespace canaspad
                 return sendWithRetries(request, retryCount + 1);
             }
         }
-
         return result;
     }
 
@@ -99,45 +99,23 @@ namespace canaspad
         // 認証情報を適用
         m_auth->applyAuthentication(modifiedRequest);
 
-        // プロキシ設定を適用
-        m_proxy->applyProxySettings(modifiedRequest);
-
-        std::string host = Utils::extractHost(modifiedRequest.getUrl());
-        int port = Utils::extractPort(modifiedRequest.getUrl());
-
-        std::shared_ptr<Connection> connection;
-        if (m_useMock)
+        // 接続の確立
+        auto connectionResult = establishConnection(modifiedRequest);
+        if (connectionResult.isError())
         {
-            connection = m_mockConnection;
+            return Result<HttpResult>(connectionResult.error());
         }
-        else
-        {
-            connection = m_connectionPool->getConnection(host, port);
-        }
-
-        if (!connection)
-        {
-            return Result<HttpResult>(ErrorInfo(ErrorCode::NetworkError, "Failed to get connection from pool"));
-        }
-
-        auto connectStart = std::chrono::steady_clock::now();
-        if (!connection->connect(host, port))
-        {
-            auto connectDuration = std::chrono::steady_clock::now() - connectStart;
-            if (connectDuration > m_timeouts.connect)
-            {
-                return Result<HttpResult>(ErrorInfo(ErrorCode::Timeout, "Connection timed out"));
-            }
-            return Result<HttpResult>(ErrorInfo(ErrorCode::NetworkError, "Failed to connect to " + host));
-        }
-
-        // プロキシトンネルの確立 (Proxy クラスに移動)
-        if (m_proxy->isEnabled() && !m_proxy->establishTunnel(connection.get(), request))
-        {
-            return Result<HttpResult>(ErrorInfo(ErrorCode::NetworkError, "Failed to establish proxy tunnel"));
-        }
+        auto connection = connectionResult.value();
 
         std::string requestStr = buildRequestString(modifiedRequest);
+
+        // 各種設定のバリデーション
+        auto validationResult = RequestValidator::validate(modifiedRequest, m_options);
+        if (validationResult.isError())
+        {
+            return Result<HttpResult>(validationResult.error());
+        }
+
         auto writeStart = std::chrono::steady_clock::now();
         if (connection->write(reinterpret_cast<const uint8_t *>(requestStr.c_str()), requestStr.length()) != requestStr.length())
         {
@@ -157,7 +135,7 @@ namespace canaspad
 
         auto httpResult = responseResult.value();
 
-        // クッキー処理 (CookieJar クラスに移動)
+        // クッキー処理
         if (m_cookiesEnabled)
         {
             for (const auto &setCookieHeader : Utils::extractHeaders(httpResult.headers, "Set-Cookie"))
@@ -170,7 +148,7 @@ namespace canaspad
         }
 
         // リダイレクト処理
-        // まずリダイレクト回数が最大を超えているかを確認する
+        // リダイレクト回数が最大を超えているかを確認
         if (redirectCount >= m_options.maxRedirects)
         {
             // リダイレクト回数が最大を超えた場合、エラーを返す
@@ -195,6 +173,112 @@ namespace canaspad
         }
 
         return httpResult;
+    }
+
+    Result<std::shared_ptr<Connection>> HttpClient::establishConnection(const Request &request)
+    {
+        std::string host = Utils::extractHost(request.getUrl());
+        int port = Utils::extractPort(request.getUrl());
+
+        std::shared_ptr<Connection> connection;
+        if (m_useMock)
+        {
+            connection = m_mockConnection;
+        }
+        else
+        {
+            connection = m_connectionPool->getConnection(host, port);
+        }
+
+        if (!connection)
+        {
+            return Result<std::shared_ptr<Connection>>(ErrorInfo(ErrorCode::NetworkError, "Failed to get connection from pool"));
+        }
+
+        if (!m_options.proxyUrl.empty())
+        {
+            return establishProxyConnection(connection, request);
+        }
+        else
+        {
+            return establishDirectConnection(connection, host, port);
+        }
+    }
+
+    Result<std::shared_ptr<Connection>> HttpClient::establishDirectConnection(std::shared_ptr<Connection> connection, const std::string &host, int port)
+    {
+        auto connectStart = std::chrono::steady_clock::now();
+        if (!connection->connect(host, port))
+        {
+            auto connectDuration = std::chrono::steady_clock::now() - connectStart;
+            if (connectDuration > m_timeouts.connect)
+            {
+                return Result<std::shared_ptr<Connection>>(ErrorInfo(ErrorCode::Timeout, "Connection timed out"));
+            }
+            return Result<std::shared_ptr<Connection>>(ErrorInfo(ErrorCode::NetworkError, "Failed to connect to " + host));
+        }
+        return Result<std::shared_ptr<Connection>>(connection);
+    }
+
+    Result<std::shared_ptr<Connection>> HttpClient::establishProxyConnection(std::shared_ptr<Connection> connection, const Request &request)
+    {
+        std::string proxyHost = Utils::extractHost(m_options.proxyUrl);
+        int proxyPort = Utils::extractPort(m_options.proxyUrl);
+        m_options.verifySsl = Utils::extractScheme(m_options.proxyUrl) == "https";
+
+        auto connectStart = std::chrono::steady_clock::now();
+        if (!connection->connect(proxyHost, proxyPort))
+        {
+            auto connectDuration = std::chrono::steady_clock::now() - connectStart;
+            if (connectDuration > m_timeouts.connect)
+            {
+                return Result<std::shared_ptr<Connection>>(ErrorInfo(ErrorCode::Timeout, "Proxy connection timed out"));
+            }
+            return Result<std::shared_ptr<Connection>>(ErrorInfo(ErrorCode::NetworkError, "Failed to proxy connect to " + proxyHost));
+        }
+
+        if (m_options.verifySsl)
+        {
+            // プロキシ経由でのSSL通信の場合、トンネルを確立する
+            auto tunnelResult = establishProxyTunnel(connection, request, proxyHost, proxyPort);
+            if (tunnelResult.isError())
+            {
+                return tunnelResult;
+            }
+        }
+        return Result<std::shared_ptr<Connection>>(connection);
+    }
+
+    Result<std::shared_ptr<Connection>> HttpClient::establishProxyTunnel(std::shared_ptr<Connection> connection, const Request &request, const std::string &proxyHost, int proxyPort)
+    {
+        std::string connectRequestStr = "CONNECT " + proxyHost + ":" + std::to_string(proxyPort) + " HTTP/1.1\r\n";
+        connectRequestStr += "Host: " + proxyHost + ":" + std::to_string(proxyPort) + "\r\n";
+        connectRequestStr += "Connection: Keep-Alive\r\n";
+        connectRequestStr += "\r\n";
+
+        auto proxyValidationResult = RequestValidator::validate(request, m_options);
+        if (proxyValidationResult.isError())
+        {
+            return Result<std::shared_ptr<Connection>>(proxyValidationResult.error());
+        }
+
+        auto writeStart = std::chrono::steady_clock::now();
+        if (connection->write(reinterpret_cast<const uint8_t *>(connectRequestStr.c_str()), connectRequestStr.length()) != connectRequestStr.length())
+        {
+            auto writeDuration = std::chrono::steady_clock::now() - writeStart;
+            if (writeDuration > m_timeouts.write)
+            {
+                return Result<std::shared_ptr<Connection>>(ErrorInfo(ErrorCode::Timeout, "Proxy write operation timed out"));
+            }
+            return Result<std::shared_ptr<Connection>>(ErrorInfo(ErrorCode::NetworkError, "Failed to send proxy request"));
+        }
+
+        auto responseResult = readResponse(connection.get(), request);
+        if (responseResult.isError() || responseResult.value().statusCode != 200)
+        {
+            return Result<std::shared_ptr<Connection>>(ErrorInfo(ErrorCode::NetworkError, "Failed to establish proxy tunnel"));
+        }
+        return Result<std::shared_ptr<Connection>>(connection);
     }
 
     Result<HttpResult> HttpClient::readResponse(Connection *connection, const Request &request)
@@ -404,8 +488,18 @@ namespace canaspad
     std::string HttpClient::buildRequestString(const Request &request)
     {
         std::ostringstream oss;
-        oss << Utils::methodToString(request.getMethod()) << " " << Utils::extractPath(request.getUrl()) << " HTTP/1.1\r\n";
-        oss << "Host: " << Utils::extractHost(request.getUrl()) << "\r\n";
+        if (!m_options.proxyUrl.empty())
+        {
+            // プロキシ使用時はリクエストラインに完全なURLを含める
+            oss << canaspad::httpMethodToString(request.getMethod()) << " " << Utils::extractScheme(request.getUrl()) << "://" << Utils::extractHost(request.getUrl()) << ":" << Utils::extractPort(request.getUrl()) << Utils::extractPath(request.getUrl()) << " HTTP/1.1\r\n";
+        }
+        else
+        {
+            // プロキシ未使用時はリクエストラインにパスのみを含める
+            oss << canaspad::httpMethodToString(request.getMethod()) << " " << Utils::extractPath(request.getUrl()) << " HTTP/1.1\r\n";
+        }
+        // Host: ヘッダーを追加 ホストとポートを含める
+        oss << "Host: " << Utils::extractHost(request.getUrl()) << ":" << Utils::extractPort(request.getUrl()) << "\r\n";
         const auto &multipartFormData = request.getMultipartFormData();
         if (!multipartFormData.empty())
         {

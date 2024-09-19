@@ -7,26 +7,16 @@
 namespace canaspad
 {
 
-    std::string Utils::methodToString(Request::Method method)
+    std::string Utils::extractScheme(const std::string &url)
     {
-        switch (method)
+        std::string::size_type protocolEnd = url.find("://");
+        if (protocolEnd == std::string::npos)
         {
-        case Request::Method::GET:
-            return "GET";
-        case Request::Method::POST:
-            return "POST";
-        case Request::Method::PUT:
-            return "PUT";
-        case Request::Method::DELETE:
-            return "DELETE";
-        case Request::Method::PATCH:
-            return "PATCH";
-        case Request::Method::HEAD:
-            return "HEAD";
-        case Request::Method::OPTIONS:
-            return "OPTIONS";
-        default:
-            return "GET";
+            return "";
+        }
+        else
+        {
+            return url.substr(0, protocolEnd);
         }
     }
 
@@ -41,7 +31,13 @@ namespace canaspad
         {
             protocolEnd += 3;
         }
-        std::string::size_type pathStart = url.find('/', protocolEnd);
+
+        // コロンの位置を探す
+        std::string::size_type colonPos = url.find(':', protocolEnd);
+
+        // pathStart をコロンかスラッシュの位置に設定
+        std::string::size_type pathStart = std::min(url.find('/', protocolEnd), colonPos);
+
         if (pathStart == std::string::npos)
         {
             return url.substr(protocolEnd);
@@ -51,11 +47,22 @@ namespace canaspad
 
     int Utils::extractPort(const std::string &url)
     {
-        std::string host = extractHost(url);
-        std::string::size_type colonPos = host.find(':');
+        std::string::size_type protocolEnd = url.find("://");
+        if (protocolEnd == std::string::npos)
+        {
+            protocolEnd = 0;
+        }
+        else
+        {
+            protocolEnd += 3; // "://" の3文字分進める
+        }
+
+        // protocolEnd 以降でコロンの位置を探す
+        std::string::size_type colonPos = url.find(':', protocolEnd);
+
         if (colonPos != std::string::npos)
         {
-            return std::stoi(host.substr(colonPos + 1));
+            return std::stoi(url.substr(colonPos + 1));
         }
         return url.substr(0, 5) == "https" ? 443 : 80;
     }

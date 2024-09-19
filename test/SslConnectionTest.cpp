@@ -43,7 +43,7 @@ void test_https_connection()
     mockClient->injectResponse(std::vector<uint8_t>(response, response + strlen(response)));
 
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://example.com").setMethod(canaspad::HttpMethod::GET);
 
     auto result = client.send(request);
 
@@ -69,7 +69,7 @@ void test_client_certificate_authentication()
     mockClient->injectResponse(std::vector<uint8_t>(response, response + strlen(response)));
 
     canaspad::Request request;
-    request.setUrl("https://client-auth.example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://client-auth.example.com").setMethod(canaspad::HttpMethod::GET);
 
     auto result = client.send(request);
 

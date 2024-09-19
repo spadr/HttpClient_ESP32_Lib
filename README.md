@@ -60,7 +60,7 @@ void setup() {
   // リクエストの作成
   canaspad::Request request;
   request.setUrl(api_url)
-         .setMethod(canaspad::Request::Method::GET); // GET, POST, PUT, DELETEなどを設定
+         .setMethod(canaspad::HttpMethod::GET); // GET, POST, PUT, DELETEなどを設定
 
   // リクエストの送信
   auto result = client.send(request);

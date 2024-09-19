@@ -14,7 +14,7 @@ void test_connection_timeout()
     mockClient->setConnectBehavior(canaspad::ConnectBehavior::AlwaysFail);
 
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://example.com").setMethod(canaspad::HttpMethod::GET);
 
     auto result = client.send(request);
 
@@ -35,7 +35,7 @@ void test_read_timeout()
     mockClient->setReadBehavior(canaspad::ReadBehavior::Timeout, std::chrono::milliseconds(500));
 
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://example.com").setMethod(canaspad::HttpMethod::GET);
 
     auto result = client.send(request);
 
@@ -55,7 +55,7 @@ void test_write_timeout()
     mockClient->setWriteBehavior(canaspad::WriteBehavior::Timeout, std::chrono::milliseconds(500));
 
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::POST).setBody("This is a test body.");
+    request.setUrl("https://example.com").setMethod(canaspad::HttpMethod::POST).setBody("This is a test body.");
 
     auto result = client.send(request);
 

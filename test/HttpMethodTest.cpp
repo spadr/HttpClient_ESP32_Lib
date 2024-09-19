@@ -12,7 +12,7 @@ void test_get_method(void)
 
     canaspad::Request getRequest;
     getRequest.setUrl("https://api.example.com/resource")
-        .setMethod(canaspad::Request::Method::GET);
+        .setMethod(canaspad::HttpMethod::GET);
     auto getResult = client.send(getRequest);
     TEST_ASSERT_TRUE(getResult.isSuccess());
     TEST_ASSERT_EQUAL_INT(200, getResult.value().statusCode);
@@ -31,7 +31,7 @@ void test_post_method(void)
 
     canaspad::Request postRequest;
     postRequest.setUrl("https://api.example.com/resource")
-        .setMethod(canaspad::Request::Method::POST)
+        .setMethod(canaspad::HttpMethod::POST)
         .setBody("{\"key\":\"value\"}");
     auto postResult = client.send(postRequest);
     TEST_ASSERT_TRUE(postResult.isSuccess());
@@ -50,7 +50,7 @@ void test_put_method(void)
 
     canaspad::Request putRequest;
     putRequest.setUrl("https://api.example.com/resource")
-        .setMethod(canaspad::Request::Method::PUT)
+        .setMethod(canaspad::HttpMethod::PUT)
         .setBody("{\"updated\":\"data\"}");
     auto putResult = client.send(putRequest);
     TEST_ASSERT_TRUE(putResult.isSuccess());
@@ -69,7 +69,7 @@ void test_delete_method(void)
 
     canaspad::Request deleteRequest;
     deleteRequest.setUrl("https://api.example.com/resource/1")
-        .setMethod(canaspad::Request::Method::DELETE);
+        .setMethod(canaspad::HttpMethod::DELETE);
     auto deleteResult = client.send(deleteRequest);
     TEST_ASSERT_TRUE(deleteResult.isSuccess());
     TEST_ASSERT_EQUAL_INT(204, deleteResult.value().statusCode);
@@ -87,7 +87,7 @@ void test_patch_method(void)
 
     canaspad::Request patchRequest;
     patchRequest.setUrl("https://api.example.com/resource/1")
-        .setMethod(canaspad::Request::Method::PATCH)
+        .setMethod(canaspad::HttpMethod::PATCH)
         .setBody("{\"partial\":\"update\"}");
     auto patchResult = client.send(patchRequest);
     TEST_ASSERT_TRUE(patchResult.isSuccess());
@@ -106,7 +106,7 @@ void test_head_method(void)
 
     canaspad::Request headRequest;
     headRequest.setUrl("https://example.com")
-        .setMethod(canaspad::Request::Method::HEAD);
+        .setMethod(canaspad::HttpMethod::HEAD);
     auto headResult = client.send(headRequest);
     TEST_ASSERT_TRUE(headResult.isSuccess());
     TEST_ASSERT_EQUAL_INT(200, headResult.value().statusCode);
@@ -125,7 +125,7 @@ void test_options_method(void)
 
     canaspad::Request optionsRequest;
     optionsRequest.setUrl("https://api.example.com")
-        .setMethod(canaspad::Request::Method::OPTIONS);
+        .setMethod(canaspad::HttpMethod::OPTIONS);
     auto optionsResult = client.send(optionsRequest);
     TEST_ASSERT_TRUE(optionsResult.isSuccess());
     TEST_ASSERT_EQUAL_INT(200, optionsResult.value().statusCode);

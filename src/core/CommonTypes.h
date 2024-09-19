@@ -24,6 +24,7 @@ namespace canaspad
         bool followRedirects = true;
         int maxRedirects = 5;
         int maxRetries = 3;
+        int port = 0; // ポート番号 (0 の場合はスキームのデフォルトポートを使用)
         std::chrono::milliseconds retryDelay = std::chrono::seconds(1);
         bool verifySsl = true;
         std::string proxyUrl;

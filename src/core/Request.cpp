@@ -3,7 +3,7 @@
 namespace canaspad
 {
 
-    Request::Request() : m_method(Method::GET) {}
+    Request::Request() : m_method(canaspad::HttpMethod::GET) {}
 
     Request &Request::setUrl(const std::string &url)
     {
@@ -11,7 +11,7 @@ namespace canaspad
         return *this;
     }
 
-    Request &Request::setMethod(Method method)
+    Request &Request::setMethod(canaspad::HttpMethod method)
     {
         m_method = method;
         return *this;
@@ -40,7 +40,7 @@ namespace canaspad
         return m_url;
     }
 
-    Request::Method Request::getMethod() const
+    canaspad::HttpMethod Request::getMethod() const
     {
         return m_method;
     }
