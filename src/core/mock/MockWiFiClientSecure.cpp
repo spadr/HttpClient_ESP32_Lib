@@ -66,6 +66,10 @@ namespace canaspad
 
     size_t MockWiFiClientSecure::write(const uint8_t *buf, size_t size)
     {
+        Serial.printf("MockWiFiClientSecure::write called. Size: %zu\n", size);
+
+        m_writePerformed += 1; // write メソッドが呼ばれたことを記録
+
         // タイムアウトシミュレーション
         if (m_writeBehavior == WriteBehavior::Timeout &&
             std::chrono::steady_clock::now() - m_operationStart > m_writeDelay)
@@ -100,48 +104,6 @@ namespace canaspad
     {
         m_writeBehavior = behavior;
         m_writeDelay = delay;
-    }
-
-    int MockWiFiClientSecure::read(uint8_t *buf, size_t size)
-    {
-        // タイムアウトシミュレーション
-        if (m_readBehavior == ReadBehavior::Timeout &&
-            std::chrono::steady_clock::now() - m_operationStart > m_readTimeout)
-        {
-            return 0; // タイムアウトをシミュレート
-        }
-
-        // 読み込みシナリオに基づいて動作
-        switch (m_readBehavior)
-        {
-        case ReadBehavior::Normal:
-            break; // 通常の動作
-
-        case ReadBehavior::SlowResponse:
-            std::this_thread::sleep_for(m_slowResponseDelay);
-            break;
-
-        case ReadBehavior::DropConnection:
-            m_connected = false; // 接続を切断
-            return 0;
-
-        default:
-            break;
-        }
-
-        // 通常の read 処理 (データの読み込み)
-        size_t readSize = std::min(size, m_receiveBuffer.size());
-        std::copy(m_receiveBuffer.begin(), m_receiveBuffer.begin() + readSize, buf);
-        m_receiveBuffer.erase(m_receiveBuffer.begin(), m_receiveBuffer.begin() + readSize);
-
-        // receiveBuffer が空になったら、キューから次のレスポンスを読み込む
-        if (m_receiveBuffer.empty() && !m_responseQueue.empty())
-        {
-            m_receiveBuffer = m_responseQueue.front();
-            m_responseQueue.pop();
-        }
-
-        return readSize;
     }
 
     void MockWiFiClientSecure::setReadBehavior(ReadBehavior behavior, std::chrono::milliseconds delay)
@@ -241,33 +203,89 @@ namespace canaspad
         return m_clientPrivateKey;
     }
 
-    bool MockWiFiClientSecure::connected() const { return m_connected; }
+    bool MockWiFiClientSecure::connected() const
+    {
+        return m_connected && !m_responses.empty();
+    }
 
-    int MockWiFiClientSecure::available() { return m_receiveBuffer.size(); }
+    int MockWiFiClientSecure::available()
+    {
+        // Serial.printf("MockWiFiClientSecure::available() called. Connected: %d, Responses: %zu\n", m_connected, m_responses.size());
+        if (!connected() || m_responses.empty())
+        {
+            // Serial.println("MockWiFiClientSecure::available() - Not connected or no responses");
+            return 0;
+        }
+
+        int availableBytes = m_responses.front().size() - m_currentResponsePos;
+        // Serial.printf("MockWiFiClientSecure::available() - Available bytes: %d\n", availableBytes);
+        return availableBytes;
+    }
+
+    void MockWiFiClientSecure::moveToNextResponse()
+    {
+        if (!m_responses.empty())
+        {
+            Serial.println("MockWiFiClientSecure::moveToNextResponse - Moving to next response");
+            m_responses.pop_front();
+            m_currentResponsePos = 0;
+            m_readPerformed = m_writePerformed;
+        }
+        else
+        {
+            Serial.println("MockWiFiClientSecure::moveToNextResponse - No more responses available");
+        }
+    }
 
     int MockWiFiClientSecure::read()
     {
-        if (m_receiveBuffer.empty())
+        Serial.printf("MockWiFiClientSecure::read() called. Connected: %d, Responses: %zu\n", m_connected, m_responses.size());
+        if (!connected())
         {
+            Serial.println("MockWiFiClientSecure::read() - Not connected or no responses");
             return -1;
         }
-        uint8_t data = m_receiveBuffer.front();
-        m_receiveBuffer.erase(m_receiveBuffer.begin());
+
+        const auto &currentResponse = m_responses.front();
+        if (m_currentResponsePos >= currentResponse.size())
+        {
+            Serial.println("MockWiFiClientSecure::read() - End of current response");
+            return -1;
+        }
+
+        uint8_t data = currentResponse[m_currentResponsePos++];
         m_log.addReceived(&data, 1);
+        Serial.printf("MockWiFiClientSecure::read() - Read byte: %02X\n", data);
         return data;
+    }
+
+    int MockWiFiClientSecure::read(uint8_t *buf, size_t size)
+    {
+        m_readPerformed += 1; // read メソッドが呼ばれたことを記録
+        Serial.printf("MockWiFiClientSecure::read called. Size: %zu\n", size);
+
+        if (!connected())
+        {
+            return 0;
+        }
+
+        const auto currentResponse = m_responses.front();
+        size_t bytesAvailable = currentResponse.size() - m_currentResponsePos;
+        size_t bytesToRead = std::min(size, bytesAvailable);
+
+        std::copy(currentResponse.begin() + m_currentResponsePos,
+                  currentResponse.begin() + m_currentResponsePos + bytesToRead,
+                  buf);
+
+        m_currentResponsePos += bytesToRead;
+        m_log.addReceived(buf, bytesToRead);
+
+        return bytesToRead;
     }
 
     void MockWiFiClientSecure::injectResponse(const std::vector<uint8_t> &response)
     {
-        // 新しいレスポンスをキューに追加
-        m_responseQueue.push(response);
-
-        // 現在の receiveBuffer が空の場合、キューの先頭からレスポンスを receiveBuffer に移動
-        if (m_receiveBuffer.empty() && !m_responseQueue.empty())
-        {
-            m_receiveBuffer = m_responseQueue.front();
-            m_responseQueue.pop();
-        }
+        m_responses.push_back(response);
     }
 
     const CommunicationLog &MockWiFiClientSecure::getCommunicationLog() const

@@ -17,6 +17,7 @@ namespace canaspad
         static int extractPort(const std::string &url);
         static std::string extractPath(const std::string &url);
         static std::string extractBaseUrl(const std::string &url);
+        static std::string extractProxyAuth(const std::string &proxyUrl);
         static std::string joinStrings(const std::vector<std::string> &strings, const std::string &delimiter);
         static std::string base64Encode(const std::string &input);
         static std::string generateBoundary();
@@ -26,6 +27,7 @@ namespace canaspad
         static std::string extractHeaderValue(const std::unordered_map<std::string, std::string> &headers, const std::string &key);
         static std::vector<std::string> extractHeaders(const std::unordered_map<std::string, std::string> &headers, const std::string &key);
         static size_t extractContentLength(const std::unordered_map<std::string, std::string> &headers);
+        static void parseHeaders(const std::string &headers, HttpResult &result);
     };
 
 } // namespace canaspad

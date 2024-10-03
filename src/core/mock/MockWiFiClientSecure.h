@@ -8,6 +8,8 @@
 #include <queue>
 #include <string>
 #include <chrono>
+#include <algorithm>
+#include <Arduino.h>
 
 namespace canaspad
 {
@@ -41,10 +43,13 @@ namespace canaspad
         ClientOptions m_options;
         bool m_connected;
         CommunicationLog m_log;
-        std::queue<std::vector<uint8_t>> m_responseQueue;
         std::vector<uint8_t> m_receiveBuffer;
+        std::deque<std::vector<uint8_t>> m_responses;
+        size_t m_currentResponsePos = 0;
         std::chrono::steady_clock::time_point m_operationStart;
         std::chrono::milliseconds m_readTimeout{0};
+        int m_writePerformed = 0;
+        int m_readPerformed = 0;
 
         // SSL 関連の設定を保持する変数
         bool m_verifySsl;
@@ -88,6 +93,11 @@ namespace canaspad
 
         // テスト用メソッド
         void injectResponse(const std::vector<uint8_t> &response);
+        void injectResponse(const std::string &response)
+        {
+            injectResponse(std::vector<uint8_t>(response.begin(), response.end()));
+        }
+        void moveToNextResponse();
         const CommunicationLog &getCommunicationLog() const;
         void setOptions(const ClientOptions &options);
         void setConnectBehavior(ConnectBehavior behavior, int failCount = 0);

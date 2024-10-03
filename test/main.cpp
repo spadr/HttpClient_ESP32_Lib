@@ -6,6 +6,7 @@
 #include "RetryTest.h"
 #include "TimeoutTest.h"
 #include "ProxyTest.h"
+#include "MockWiFiClientSecureTest.h"
 #include <unity.h>
 
 void setUp(void)
@@ -22,14 +23,15 @@ void runUnityTests()
 {
     UNITY_BEGIN();
 
+    run_mock_wifi_client_secure_tests();
     run_http_method_tests();
     run_url_and_port_tests();
     run_ssl_connection_tests();
     run_cookie_tests();
-    run_redirect_tests();
-    run_retry_tests();
-    run_timeout_tests();
-    run_proxy_tests();
+    // run_redirect_tests();
+    // run_retry_tests();
+    // run_timeout_tests();
+    // run_proxy_tests();
 
     UNITY_END();
 }

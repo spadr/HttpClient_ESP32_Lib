@@ -32,6 +32,14 @@ namespace canaspad
             protocolEnd += 3;
         }
 
+        // '@' の位置を探す
+        std::string::size_type authEnd = url.find('@', protocolEnd);
+        if (authEnd != std::string::npos)
+        {
+            // 認証情報がある場合は、'@' 以降からホスト名を抽出
+            protocolEnd = authEnd + 1;
+        }
+
         // コロンの位置を探す
         std::string::size_type colonPos = url.find(':', protocolEnd);
 
@@ -55,6 +63,14 @@ namespace canaspad
         else
         {
             protocolEnd += 3; // "://" の3文字分進める
+        }
+
+        // '@' の位置を探す
+        std::string::size_type authEnd = url.find('@', protocolEnd);
+        if (authEnd != std::string::npos)
+        {
+            // 認証情報がある場合は、'@' 以降からポート番号を抽出
+            protocolEnd = authEnd + 1;
         }
 
         // protocolEnd 以降でコロンの位置を探す
@@ -109,6 +125,23 @@ namespace canaspad
         }
 
         return url.substr(0, pathStart);
+    }
+
+    std::string Utils::extractProxyAuth(const std::string &proxyUrl)
+    {
+        // プロキシ認証情報 (user:password) の開始位置と終了位置を探す
+        std::string::size_type authStart = proxyUrl.find("://") + 3;
+        std::string::size_type authEnd = proxyUrl.find('@');
+
+        // 認証情報が見つかった場合
+        if (authStart != std::string::npos && authEnd != std::string::npos && authStart < authEnd)
+        {
+            // 認証情報を抽出してBase64エンコードする
+            std::string auth = proxyUrl.substr(authStart, authEnd - authStart);
+            return base64Encode(auth);
+        }
+        // 認証情報が見つからない場合は空文字列を返す
+        return "";
     }
 
     std::string Utils::joinStrings(const std::vector<std::string> &strings, const std::string &delimiter)
@@ -287,6 +320,23 @@ namespace canaspad
             return std::stoul(it->second);
         }
         return 0;
+    }
+
+    void Utils::parseHeaders(const std::string &headers, HttpResult &result)
+    {
+        std::istringstream stream(headers);
+        std::string line;
+
+        // 最初の行はステータスラインなのでスキップ
+        std::getline(stream, line);
+
+        while (std::getline(stream, line))
+        {
+            if (line.empty() || line == "\r")
+                break; // ヘッダーの終わり
+
+            parseHeader(line, result);
+        }
     }
 
 } // namespace canaspad

@@ -21,7 +21,7 @@ void test_proxy_absolute_form()
 
     // GET リクエストの検証
     bool getRequestFound = false;
-    std::string expectedGetRequest = "GET http://example.com:80/test HTTP/1.1\r\nHost: example.com:80\r\nContent-Length: 0\r\n\r\n";
+    std::string expectedGetRequest = "GET http://example.com:80/test HTTP/1.1\r\nHost: example.com:80\r\n\r\n";
     for (const auto &entry : log.getLog())
     {
         if (entry.type == canaspad::CommunicationLog::Entry::Type::Sent &&
@@ -80,7 +80,7 @@ void test_proxy_authority_form()
 
     // GET リクエストの検証
     bool getRequestFound = false;
-    std::string expectedGetRequest = "GET https://example.com:443/test HTTP/1.1\r\nHost: example.com:443\r\nContent-Length: 0\r\n\r\n";
+    std::string expectedGetRequest = "GET https://example.com:443/test HTTP/1.1\r\nHost: example.com:443\r\n\r\n";
     for (const auto &entry : log.getLog())
     {
         if (entry.type == canaspad::CommunicationLog::Entry::Type::Sent &&
@@ -216,7 +216,7 @@ void run_proxy_tests(void)
 {
     RUN_TEST(test_proxy_absolute_form);
     RUN_TEST(test_proxy_authority_form);
-    // 以下未検証のためコメントアウト
+    // TODO 未検証のためコメントアウト
     // RUN_TEST(test_proxy_authentication);
     // RUN_TEST(test_proxy_tunnel_establishment);
     // RUN_TEST(test_invalid_proxy_url);

@@ -4,5 +4,6 @@
 .vscode/launch.json
 .vscode/ipch
 /src/Config.h
+/src/Config2.h
 show_files.dart
 *.log

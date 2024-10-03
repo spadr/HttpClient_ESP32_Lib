@@ -20,19 +20,55 @@ struct tm timeInfo;
 void setup()
 {
     Serial.begin(115200);
+
+    // Connect to WiFi
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(1000);
+        Serial.println("Connecting to WiFi...");
+    }
+    Serial.println("Connected to WiFi");
+
+    // Connect to NTP Server
+    Serial.println("Waiting for NTP time sync...");
+    configTime(gmt_offset_sec, daylight_offset_sec, ntp_host);
+    while (!time(nullptr))
+    {
+        delay(1000);
+        Serial.print(".");
+    }
+    getLocalTime(&timeInfo);
+    Serial.println("\nNTP time synced");
+    Serial.println("Starting HttpClient test...");
+
     bool useMock = true;
     canaspad::ClientOptions options;
-    options.proxyUrl = "http://proxy.example.com:8080";
+    options.verifySsl = true;
+    options.rootCA = isrg_root_x1;
+    options.followRedirects = true;
+    // options.proxyUrl = "http://160.248.80.91:22";
     canaspad::HttpClient client(options, useMock);
     auto *mockClient = static_cast<canaspad::MockWiFiClientSecure *>(client.getConnection());
 
-    // プロキシ経由での通信のレスポンスを設定
-    const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello";
-    mockClient->injectResponse(std::vector<uint8_t>(response, response + strlen(response)));
+    // リダイレクトレスポンス (302 Found)
+    const char *response1 =
+        "HTTP/1.1 302 Found\r\n"
+        "Location: https://example2.com/redirected\r\n"
+        "\r\n\r\n";
+    mockClient->injectResponse(std::vector<uint8_t>(response1, response1 + strlen(response1)));
 
+    // 最終的なレスポンス
+    const char *response2 =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/plain\r\n"
+        "Content-Length: 18\r\n\r\n"
+        "Redirected page!";
+    mockClient->injectResponse(std::vector<uint8_t>(response2, response2 + strlen(response2)));
+
+    // 最初のGETリクエスト
     canaspad::Request request;
-    request.setUrl("http://example.com/test").setMethod(canaspad::HttpMethod::GET);
-
+    request.setUrl("https://example1.com/init").setMethod(canaspad::HttpMethod::GET);
     auto result = client.send(request);
 
     if (result.isSuccess())
@@ -56,10 +92,12 @@ void setup()
             if (entry.type == canaspad::CommunicationLog::Entry::Type::Sent)
             {
                 std::string requestStr(entry.data.begin(), entry.data.end());
+                Serial.println("Sent:");
                 Serial.println(requestStr.c_str());
             }
             else if (entry.type == canaspad::CommunicationLog::Entry::Type::Received)
             {
+                Serial.println("Received:");
                 std::string responseStr(entry.data.begin(), entry.data.end());
                 Serial.println(responseStr.c_str());
             }

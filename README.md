@@ -160,3 +160,6 @@ client.setProgressCallback([](size_t bytesRead, size_t contentLength) {
 ### 📝 ライセンス
 
 このライブラリはGPL3ライセンスで提供されています。
+
+### 🛠️ 検証用環境
+[ドキュメント](docs/verification_server.md) を参照して、検証用サーバをセットアップしてください。

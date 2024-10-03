@@ -72,7 +72,7 @@ namespace canaspad
         Result<std::shared_ptr<Connection>> establishProxyConnection(std::shared_ptr<Connection> connection, const Request &request);
         Result<std::shared_ptr<Connection>> establishProxyTunnel(std::shared_ptr<Connection> connection, const Request &request, const std::string &proxyHost, int proxyPort);
         Result<HttpResult> readResponse(Connection *connection, const Request &request);
-        Result<HttpResult> handleChunkedResponse(Connection *connection, HttpResult &result);
+        Result<HttpResult> handleChunkedResponse(Connection *connection, HttpResult &result, size_t startingPos);
 
         std::string buildRequestString(const Request &request);
     };
