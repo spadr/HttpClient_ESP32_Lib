@@ -11,8 +11,8 @@ void test_http_client_redirect_handling()
     // リダイレクトレスポンス (302 Found)
     const char *response1 =
         "HTTP/1.1 302 Found\r\n"
-        "Location: https://example.com/redirected\r\n"
-        "Content-Length: 0\r\n\r\n";
+        "Location: https://example2.com/redirected\r\n"
+        "\r\n\r\n";
     mockClient->injectResponse(std::vector<uint8_t>(response1, response1 + strlen(response1)));
 
     // 最終的なレスポンス
@@ -25,7 +25,7 @@ void test_http_client_redirect_handling()
 
     // 最初のGETリクエスト
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://example1.com/init").setMethod(canaspad::HttpMethod::GET);
     auto result = client.send(request);
 
     // リダイレクトを追跡し、最終的なレスポンスが取得できていることを確認
@@ -51,7 +51,7 @@ void test_http_client_disable_redirect_following()
 
     // 最初のGETリクエスト
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://example.com").setMethod(canaspad::HttpMethod::GET);
     auto result = client.send(request);
 
     // リダイレクトを追跡せず、302 Found レスポンスが取得できていることを確認
@@ -63,23 +63,41 @@ void test_http_client_too_many_redirects()
 {
     canaspad::ClientOptions options;
     options.verifySsl = false;
+    options.followRedirects = true;
     options.maxRedirects = 3; // リダイレクト最大回数を3に設定
     canaspad::HttpClient client(options, true);
     auto *mockClient = static_cast<canaspad::MockWiFiClientSecure *>(client.getConnection());
 
-    // リダイレクトレスポンス (302 Found) を4回注入
-    const char *response =
+    // リダイレクトレスポンス (302 Found) を5回注入
+    const char *response1 =
         "HTTP/1.1 302 Found\r\n"
-        "Location: https://example.com/redirected\r\n"
+        "Location: https://example1.com/redirected\r\n"
         "Content-Length: 0\r\n\r\n";
-    for (int i = 0; i < 4; ++i)
-    {
-        mockClient->injectResponse(std::vector<uint8_t>(response, response + strlen(response)));
-    }
+    const char *response2 =
+        "HTTP/1.1 302 Found\r\n"
+        "Location: https://example2.com/redirected\r\n"
+        "Content-Length: 0\r\n\r\n";
+    const char *response3 =
+        "HTTP/1.1 302 Found\r\n"
+        "Location: https://example3.com/redirected\r\n"
+        "Content-Length: 0\r\n\r\n";
+    const char *response4 =
+        "HTTP/1.1 302 Found\r\n"
+        "Location: https://example4.com/redirected\r\n"
+        "Content-Length: 0\r\n\r\n";
+    const char *response5 =
+        "HTTP/1.1 302 Found\r\n"
+        "Location: https://example5.com/redirected\r\n"
+        "Content-Length: 0\r\n\r\n";
+    mockClient->injectResponse(std::vector<uint8_t>(response1, response1 + strlen(response1)));
+    mockClient->injectResponse(std::vector<uint8_t>(response2, response2 + strlen(response2)));
+    mockClient->injectResponse(std::vector<uint8_t>(response3, response3 + strlen(response3)));
+    mockClient->injectResponse(std::vector<uint8_t>(response4, response4 + strlen(response4)));
+    mockClient->injectResponse(std::vector<uint8_t>(response5, response5 + strlen(response5)));
 
     // 最初のGETリクエスト
     canaspad::Request request;
-    request.setUrl("https://example.com").setMethod(canaspad::Request::Method::GET);
+    request.setUrl("https://example0.com").setMethod(canaspad::HttpMethod::GET);
     auto result = client.send(request);
 
     // リダイレクト回数が最大を超えたため、エラーが発生することを確認

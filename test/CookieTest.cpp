@@ -62,7 +62,7 @@ void test_http_client_cookie_handling()
 
     // 最初のGETリクエスト
     canaspad::Request request1;
-    request1.setUrl("https://example.com/").setMethod(canaspad::Request::Method::GET);
+    request1.setUrl("https://example.com/").setMethod(canaspad::HttpMethod::GET);
     auto result1 = client.send(request1);
 
     // クッキーが設定されていることを確認
@@ -80,7 +80,7 @@ void test_http_client_cookie_handling()
 
     // 2回目のGETリクエスト (クッキーが自動的に付与される)
     canaspad::Request request2;
-    request2.setUrl("https://example.com/resource").setMethod(canaspad::Request::Method::GET);
+    request2.setUrl("https://example.com/resource").setMethod(canaspad::HttpMethod::GET);
     auto result2 = client.send(request2);
 
     // レスポンスボディを確認
