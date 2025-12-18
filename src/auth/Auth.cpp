@@ -1,6 +1,6 @@
 #include "Auth.h"
 #include "../utils/Utils.h"
-#include "../HttpClient.h"
+#include "../core/CommonTypes.h"
 
 namespace canaspad
 {
