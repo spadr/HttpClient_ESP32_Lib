@@ -161,5 +161,51 @@ client.setProgressCallback([](size_t bytesRead, size_t contentLength) {
 
 このライブラリはGPL3ライセンスで提供されています。
 
-### 🛠️ 検証用環境
-[ドキュメント](docs/verification_server.md) を参照して、検証用サーバをセットアップしてください。
+## 📚 ドキュメント
+
+### 🚀 開発環境セットアップ
+
+ESP32実機でのテスト環境構築から実際の開発まで、完全に検証済みの手順を提供します：
+
+- **[WSL ESP32完全構築ガイド](docs/WSL_ESP32_COMPLETE_GUIDE.md)** 🔧  
+  WSL環境でのESP32開発環境の完全セットアップ手順（usbipd-winからテスト実行まで）
+
+- **[ESP32開発用スクリプト](scripts/README.md)** ⚡  
+  ESP32の自動接続・テスト実行を効率化するスクリプト集
+
+### 🧪 テスト & デバッグ
+
+実際のESP32実機テストで検証済みの手順とトラブルシューティング：
+
+- **[実機テスト手順書](docs/TESTING_PROCEDURE.md)** 📋  
+  HttpClientライブラリの実機テスト詳細とAPIの実際の使用例
+
+- **[トラブルシューティングガイド](docs/TROUBLESHOOTING_GUIDE.md)** 🚨  
+  実際に遭遇した問題と検証済みの解決策（環境構築からコード実行まで）
+
+### 💻 日常的な開発
+
+効率的な開発ワークフローとベストプラクティス：
+
+- **[開発ワークフロー](docs/DEVELOPMENT_WORKFLOW.md)** 🔄  
+  日常的な開発フローの最適化とCI/CD連携
+
+### 🛠️ 追加リソース
+
+- [🧪 ツールとテスト実行ガイド](docs/TOOLS_AND_TESTING.md) - テスト実行方法、開発ツール
+- [📋 実装ガイド](docs/implementation_guide.md) - 新機能追加時の参考  
+- [🗺️ 移行ロードマップ](docs/migration_roadmap.md) - 将来の計画
+
+## 🎯 クイックスタート
+
+### ESP32実機テストを今すぐ始める
+
+1. **環境構築**: [WSL ESP32完全構築ガイド](docs/WSL_ESP32_COMPLETE_GUIDE.md) に従ってセットアップ
+2. **デバイス接続**: `./scripts/esp32_attach.sh` でESP32を自動接続
+3. **テスト実行**: `~/.platformio/penv/bin/pio test -e m5stack-atom --upload-port /dev/ttyUSB0`
+
+### 問題が発生した場合
+
+- **セットアップ問題**: [WSL ESP32完全構築ガイド](docs/WSL_ESP32_COMPLETE_GUIDE.md) の手順を確認
+- **接続問題**: [トラブルシューティングガイド](docs/TROUBLESHOOTING_GUIDE.md) で解決策を検索
+- **テスト問題**: [実機テスト手順書](docs/TESTING_PROCEDURE.md) で正しいAPIの使用方法を確認
