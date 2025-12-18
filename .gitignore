@@ -40,6 +40,7 @@ __pycache__/
 *.temp
 *.swp
 *~
+memo
 
 # AI-specific settings
 /.claude/
