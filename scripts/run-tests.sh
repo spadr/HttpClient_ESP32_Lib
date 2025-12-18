@@ -133,9 +133,15 @@ run_layer2() {
         fi
     fi
     
+    echo -e "${BLUE}Running Native Mock Tests...${NC}"
+    pio test -e test_native_mock $VERBOSE
+    local mock_result=$?
+
+    echo -e "${BLUE}Running Legacy Integration Tests...${NC}"
     pio test -e native_integration $VERBOSE
+    local integration_result=$?
     
-    if [[ $? -eq 0 ]]; then
+    if [[ $mock_result -eq 0 && $integration_result -eq 0 ]]; then
         echo -e "${GREEN}✅ Layer 2 tests passed${NC}"
         return 0
     else

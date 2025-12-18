@@ -100,7 +100,10 @@ g++ -std=c++17 -DNATIVE_TEST -DARDUINO_ARCH_NATIVE \
 # MockServer起動
 docker-compose up -d mockserver
 
-# 統合テスト実行
+# 統合テスト実行 (Native Mock - 推奨)
+~/.platformio/penv/bin/pio test -e test_native_mock
+
+# 統合テスト実行 (Legacy)
 ~/.platformio/penv/bin/pio test -e test_integration
 ```
 

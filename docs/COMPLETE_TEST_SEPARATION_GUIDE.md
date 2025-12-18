@@ -141,9 +141,9 @@ extends = env:test_integration
 |----------|----------|----------|----------|
 | `pio test` | `test_unit`（ユニットのみ） | 3-10秒 | PC Native |
 | `pio test -e test_unit` | ユニットテスト明示実行 | 3-10秒 | PC Native |
-| `pio test -e test_integration` | Integration だけ | 10-30秒 | PC Native + Mock |
-| `pio test -e test_all` | Unit + Integration（PC） | 15-40秒 | PC Native |
-| `pio test -e test_esp32 --upload-port /dev/ttyUSB0` | 実機E2E（ビルド→書込み→実行） | 1-3分 | ESP32実機 |
+| `pio test -e test_native_mock` | Native Mock 統合テスト | 5-15秒 | PC Native + Mock |
+| `pio test -e test_integration` | Integration だけ（旧方式） | 10-30秒 | PC Native + Mock |
+| `pio test -e test_esp32` | 実機E2E（ビルド→書込み→実行） | 1-3分 | ESP32実機 |
 
 ### 高度な実行オプション
 

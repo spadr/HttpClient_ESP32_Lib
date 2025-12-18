@@ -13,10 +13,18 @@ namespace canaspad
                                    std::shared_ptr<Connection> connection)
         : m_maxConnections(10),
           m_maxIdleTime(std::chrono::seconds(60)),
-          m_cookieJar(std::make_shared<CookieJar>()),
-          m_options(options),
-          m_defaultConnection(connection ? connection : std::make_shared<WiFiSecureConnection>())
+          m_options(options)
     {
+        m_cookieJar = std::make_shared<CookieJar>();
+
+        if (connection)
+        {
+            m_defaultConnection = connection;
+        }
+        else
+        {
+            m_defaultConnection = std::make_shared<WiFiSecureConnection>();
+        }
     }
 
     ConnectionPool::~ConnectionPool() { disconnectAll(); }

@@ -7,7 +7,11 @@
 #include "../utils/Utils.h"
 #include "WiFiSecureConnection.h"
 #include "mock/MockWiFiClientSecure.h"
+#ifdef ARDUINO_ARCH_NATIVE
+#include "NativeSocketConnection.h"
+#endif
 #include "RequestValidator.h"
+#include <iostream>
 
 // Static constexpr member definitions (required for C++14/17 compatibility)
 constexpr size_t canaspad::HttpClient::DEFAULT_BUFFER_SIZE;
@@ -25,7 +29,13 @@ namespace canaspad
         : m_connectionPool(std::make_unique<ConnectionPool>(
               options,
               useMock ? std::shared_ptr<Connection>(new MockWiFiClientSecure(options))
-                      : std::shared_ptr<Connection>(new WiFiSecureConnection()))),
+                      :
+#ifdef ARDUINO_ARCH_NATIVE
+                      std::shared_ptr<Connection>(new NativeSocketConnection())
+#else
+                      std::shared_ptr<Connection>(new WiFiSecureConnection())
+#endif
+                  )),
           m_auth(std::make_unique<Auth>(options)),
           m_isInitialized(true),
           m_initializationError(ErrorCode::None, ""),
@@ -38,8 +48,10 @@ namespace canaspad
         }
         else
         {
-            m_connectionPool = std::make_unique<ConnectionPool>(options);
+            // m_connectionPool は初期化子リストですでに初期化されているため再作成不要
+            // m_connectionPool = std::make_unique<ConnectionPool>(options);
 
+#ifndef ARDUINO_ARCH_NATIVE
             time_t now;
             time(&now);
             if (now < 3600 * 9)
@@ -49,6 +61,7 @@ namespace canaspad
                     ErrorCode::TimeNotSet,
                     "System time is not set. Please synchronize with NTP server."));
             }
+#endif
         }
     }
 
@@ -424,7 +437,7 @@ namespace canaspad
             bool headersCompleted = false;
             size_t contentLength = 0;
 
-            while (connection->connected() && connection->available() > 0)
+            while (connection->connected())
             {
                 // タイムアウトチェックを追加
                 if (std::chrono::steady_clock::now() - readStart >= m_timeouts.read)
@@ -482,7 +495,7 @@ namespace canaspad
                 }
                 else
                 {
-                    delay(10);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 }
             }
 
@@ -664,18 +677,18 @@ namespace canaspad
     std::string HttpClient::buildRequestString(const Request &request)
     {
         // URL成分を一度だけ解析してキャッシュ
-        const std::string& url = request.getUrl();
+        const std::string &url = request.getUrl();
         const std::string scheme = Utils::extractScheme(url);
         const std::string host = Utils::extractHost(url);
         const int port = Utils::extractPort(url);
         const std::string path = Utils::extractPath(url);
-        
+
         std::ostringstream oss;
-        
+
         if (!m_options.proxyUrl.empty())
         {
             // プロキシ使用時はリクエストラインに完全なURLを含める
-            oss << canaspad::httpMethodToString(request.getMethod()) << " " 
+            oss << canaspad::httpMethodToString(request.getMethod()) << " "
                 << scheme << "://" << host << ":" << port << path << " HTTP/1.1\r\n";
         }
         else

@@ -38,13 +38,14 @@ cd docker && docker-compose -f test-services.yml up -d && cd ..
 
 ```bash
 # Layer 1: ユニットテスト
-pio test -e native
+pio test -e test_unit
 
-# Layer 2: 統合テスト
-pio test -e native_integration
+# Layer 2: 統合テスト（Native Mock & Legacy）
+pio test -e test_native_mock    # Native Mock (Recommended)
+pio test -e native_integration  # Legacy Integration
 
 # Layer 3: E2Eテスト
-pio test -e m5stack-atom --filter "e2e/*"
+pio test -e test_esp32
 
 # 特定のカテゴリのみ実行
 pio test -e native --filter "unit/cookie/*"    # Cookieテストのみ
