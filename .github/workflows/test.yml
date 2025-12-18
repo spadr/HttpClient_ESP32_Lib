@@ -1,0 +1,154 @@
+name: HttpClient ESP32 Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # Layer 1: Fast Unit Tests
+  unit-tests:
+    runs-on: ubuntu-latest
+    name: Layer 1 - Unit Tests
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Cache pip
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install PlatformIO Core
+      run: pip install --upgrade platformio
+    
+    - name: Run Unit Tests
+      run: pio test -e native --verbose
+      
+    - name: Upload Unit Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: unit-test-results
+        path: .pio/test/
+
+  # Layer 2: Integration Tests with MockServer
+  integration-tests:
+    runs-on: ubuntu-latest
+    name: Layer 2 - Integration Tests
+    
+    services:
+      mockserver:
+        image: mockserver/mockserver:5.15.0
+        ports:
+          - 1080:1080
+        options: >-
+          --health-cmd "curl -f http://localhost:1080/mockserver/status || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libcurl4-openssl-dev
+        pip install --upgrade platformio
+    
+    - name: Wait for MockServer
+      run: |
+        timeout 60 bash -c 'until curl -f http://localhost:1080/mockserver/status; do sleep 2; done'
+    
+    - name: Run Integration Tests
+      run: pio test -e native_integration --verbose
+      
+    - name: Upload Integration Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: integration-test-results
+        path: .pio/test/
+
+  # Layer 3: ESP32 Hardware Tests (optional, requires hardware)
+  hardware-tests:
+    runs-on: ubuntu-latest
+    name: Layer 3 - Hardware Tests (Build Only)
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install PlatformIO Core
+      run: pip install --upgrade platformio
+    
+    - name: Build ESP32 Tests
+      run: |
+        pio test -e m5stack-atom --without-testing --verbose
+        pio test -e m5stack-atom-ex --without-testing --verbose
+
+  # Test Report Generation
+  test-report:
+    runs-on: ubuntu-latest
+    name: Generate Test Report
+    needs: [unit-tests, integration-tests]
+    if: always()
+    
+    steps:
+    - name: Download Unit Test Results
+      uses: actions/download-artifact@v3
+      with:
+        name: unit-test-results
+        path: ./unit-results/
+    
+    - name: Download Integration Test Results
+      uses: actions/download-artifact@v3
+      with:
+        name: integration-test-results
+        path: ./integration-results/
+    
+    - name: Generate Test Summary
+      run: |
+        echo "# Test Results Summary" > test-summary.md
+        echo "" >> test-summary.md
+        echo "## Layer 1: Unit Tests" >> test-summary.md
+        if [ -d "./unit-results" ]; then
+          echo "✅ Unit tests executed" >> test-summary.md
+        else
+          echo "❌ Unit tests failed" >> test-summary.md
+        fi
+        echo "" >> test-summary.md
+        echo "## Layer 2: Integration Tests" >> test-summary.md
+        if [ -d "./integration-results" ]; then
+          echo "✅ Integration tests executed" >> test-summary.md
+        else
+          echo "❌ Integration tests failed" >> test-summary.md
+        fi
+        echo "" >> test-summary.md
+        echo "Generated at: $(date)" >> test-summary.md
+    
+    - name: Upload Test Summary
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-summary
+        path: test-summary.md
