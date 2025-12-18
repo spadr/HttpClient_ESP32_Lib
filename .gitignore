@@ -5,5 +5,34 @@
 .vscode/ipch
 /src/Config.h
 /src/Config2.h
+/test/Config.h
 show_files.dart
 *.log
+
+# Test executables
+test_utils
+test_cookie
+test_auth
+test_request_validator
+test_debug
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.dylib
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
