@@ -10,10 +10,15 @@ show_files.dart
 
 # Test executables
 test_utils
+!test_utils/
 test_cookie
+!test_cookie/
 test_auth
+!test_auth/
 test_request_validator
+!test_request_validator/
 test_debug
+!test_debug/
 
 # Build artifacts
 *.o
