@@ -1,0 +1,46 @@
+version: '3.8'
+services:
+  mockserver:
+    image: mockserver/mockserver:5.15.0
+    ports:
+      - "1080:1080"
+    environment:
+      MOCKSERVER_INITIALIZATION_JSON_PATH: /config/expectations.json
+      MOCKSERVER_LOG_LEVEL: INFO
+    volumes:
+      - ../test/fixtures/mockserver:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1080/mockserver/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  wiremock:
+    image: wiremock/wiremock:2.35.0
+    ports:
+      - "8080:8080"
+    command: >
+      --global-response-templating
+      --verbose
+    volumes:
+      - ../test/fixtures/wiremock/__files:/home/wiremock/__files
+      - ../test/fixtures/wiremock/mappings:/home/wiremock/mappings
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/__admin/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  proxy:
+    image: ubuntu/squid:latest
+    ports:
+      - "3128:3128"
+    volumes:
+      - ../test/fixtures/proxy/squid.conf:/etc/squid/squid.conf
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "3128"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
