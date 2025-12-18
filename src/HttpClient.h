@@ -25,6 +25,10 @@ namespace canaspad
         HttpClient(const ClientOptions &options = ClientOptions(), bool useMock = false);
         ~HttpClient();
 
+        // Constants
+        static constexpr size_t DEFAULT_BUFFER_SIZE = 4096;
+        static constexpr size_t DEFAULT_REQUEST_BUFFER_RESERVE = 1024;
+
         struct Timeouts
         {
             std::chrono::milliseconds connect{5000};

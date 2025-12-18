@@ -1,4 +1,4 @@
-#include "HttpClient.h"
+#include "../HttpClient.h"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -8,7 +8,15 @@
 #include "WiFiSecureConnection.h"
 #include "mock/MockWiFiClientSecure.h"
 #include "RequestValidator.h"
+
+// Static constexpr member definitions (required for C++14/17 compatibility)
+constexpr size_t canaspad::HttpClient::DEFAULT_BUFFER_SIZE;
+constexpr size_t canaspad::HttpClient::DEFAULT_REQUEST_BUFFER_RESERVE;
+#ifndef ARDUINO_ARCH_NATIVE
 #include <Arduino.h>
+#else
+#include "../native_arduino_compat.h"
+#endif
 
 namespace canaspad
 {
@@ -115,6 +123,13 @@ namespace canaspad
             return Result<HttpResult>(connectionResult.error());
         }
         auto connection = connectionResult.value();
+
+        // Connection null check
+        if (!connection)
+        {
+            Serial.println("HttpClient::sendWithRedirects - Connection is null");
+            return Result<HttpResult>(ErrorInfo(ErrorCode::NetworkError, "Connection is null"));
+        }
 
         std::string requestStr = buildRequestString(modifiedRequest);
         Serial.printf("HttpClient::sendWithRedirects - Request string built. Length: %zu\n", requestStr.length());
@@ -392,12 +407,17 @@ namespace canaspad
 
     Result<HttpResult> HttpClient::readResponse(Connection *connection, const Request &request)
     {
+        if (!connection)
+        {
+            return Result<HttpResult>(ErrorInfo(ErrorCode::InvalidResponse, "Connection is null"));
+        }
+
         HttpResult httpResult;
         auto readStart = std::chrono::steady_clock::now();
 
         try
         {
-            const size_t bufferSize = 4096;
+            const size_t bufferSize = HttpClient::DEFAULT_BUFFER_SIZE;
             uint8_t buffer[bufferSize];
             size_t totalBytesRead = 0;
             std::string responseStr;
@@ -643,19 +663,28 @@ namespace canaspad
 
     std::string HttpClient::buildRequestString(const Request &request)
     {
+        // URL成分を一度だけ解析してキャッシュ
+        const std::string& url = request.getUrl();
+        const std::string scheme = Utils::extractScheme(url);
+        const std::string host = Utils::extractHost(url);
+        const int port = Utils::extractPort(url);
+        const std::string path = Utils::extractPath(url);
+        
         std::ostringstream oss;
+        
         if (!m_options.proxyUrl.empty())
         {
             // プロキシ使用時はリクエストラインに完全なURLを含める
-            oss << canaspad::httpMethodToString(request.getMethod()) << " " << Utils::extractScheme(request.getUrl()) << "://" << Utils::extractHost(request.getUrl()) << ":" << Utils::extractPort(request.getUrl()) << Utils::extractPath(request.getUrl()) << " HTTP/1.1\r\n";
+            oss << canaspad::httpMethodToString(request.getMethod()) << " " 
+                << scheme << "://" << host << ":" << port << path << " HTTP/1.1\r\n";
         }
         else
         {
             // プロキシ未使用時はリクエストラインにパスのみを含める
-            oss << canaspad::httpMethodToString(request.getMethod()) << " " << Utils::extractPath(request.getUrl()) << " HTTP/1.1\r\n";
+            oss << canaspad::httpMethodToString(request.getMethod()) << " " << path << " HTTP/1.1\r\n";
         }
         // Host: ヘッダーを追加 ホストとポートを含める
-        oss << "Host: " << Utils::extractHost(request.getUrl()) << ":" << Utils::extractPort(request.getUrl()) << "\r\n";
+        oss << "Host: " << host << ":" << port << "\r\n";
         const auto &multipartFormData = request.getMultipartFormData();
 
         // プロキシ認証
@@ -711,5 +740,4 @@ namespace canaspad
 
         return oss.str();
     }
-
 } // namespace canaspad
