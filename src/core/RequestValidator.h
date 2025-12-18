@@ -15,6 +15,8 @@ namespace canaspad
         static Result<void> validateUrl(const std::string &url);
         static Result<void> validateMethod(HttpMethod method);
         static Result<void> validateClientOptions(const ClientOptions &options);
+        static Result<void> validateHeaders(const Request &request);
+        static Result<void> validateBody(const Request &request);
     };
 
 } // namespace canaspad
