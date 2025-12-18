@@ -10,14 +10,7 @@
 #include "../HttpClient.h"
 #include "../core/mock/MockWiFiClientSecure.h"
 
-// Config.h が存在するかどうかをチェック
-#ifdef CONFIG_H_EXISTS
-#include "../Config.h"
-using namespace Config;
-#else
 #include "../ConfigExample.h"
-using namespace ConfigExample;
-#endif
 
 namespace app {
 
@@ -28,7 +21,7 @@ void init() {
 #ifndef ARDUINO_ARCH_NATIVE
     // WiFi接続
     Serial.println("Connecting to WiFi...");
-    WiFi.begin(ssid, password);
+    WiFi.begin(ConfigExample::ssid, ConfigExample::password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(1000);
         Serial.print(".");
@@ -37,7 +30,7 @@ void init() {
 
     // NTP時刻同期
     Serial.println("Waiting for NTP time sync...");
-    configTime(gmt_offset_sec, daylight_offset_sec, ntp_host);
+    configTime(ConfigExample::gmt_offset_sec, ConfigExample::daylight_offset_sec, ConfigExample::ntp_host);
     struct tm timeInfo;
     while (!time(nullptr)) {
         delay(1000);
@@ -74,7 +67,7 @@ void runDemo() {
     canaspad::ClientOptions options;
     options.verifySsl = true;
 #ifndef ARDUINO_ARCH_NATIVE
-    options.rootCA = isrg_root_x1;
+    options.rootCA = ConfigExample::isrg_root_x1;
 #endif
     options.followRedirects = true;
     
