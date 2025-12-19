@@ -63,14 +63,14 @@ test/
 
 ```bash
 # Run all tests
-./scripts/test-local.sh
+./scripts/run-all-tests.sh
 
 # Run specific test layers
 pio test -e native                # Unit tests only
 pio test -e native_integration    # Integration tests only
 
 # Run with recording mode (for E2E tests)
-./scripts/test-local.sh --record
+RECORD_MODE=1 ./scripts/run-all-tests.sh -l 3
 ```
 
 ### Continuous Integration
@@ -277,7 +277,7 @@ TestHelpers::assertContains(string, substring)
 3. **Permission errors**
    ```bash
    # Fix script permissions
-   chmod +x scripts/test-local.sh
+   chmod +x scripts/run-all-tests.sh
    ```
 
 ### Debug Mode

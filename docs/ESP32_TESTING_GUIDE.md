@@ -35,8 +35,8 @@ HttpClient ESP32ライブラリのESP32実機でのテスト実行手順とト�
 # プロジェクトルートで実行
 cd HttpClient_ESP32_Lib
 
-# ESP32準備スクリプト実行
-./scripts/prepare_esp32_test.sh
+# ESP32準備（接続確認）
+pio device list
 ```
 
 ### 2. WiFi設定確認
@@ -234,7 +234,6 @@ if (result.isOk()) {
 
 - `test/main.cpp` - ESP32テストメイン
 - `src/Config.h` - WiFi・SSL設定
-- `scripts/prepare_esp32_test.sh` - 環境準備
 - `test/test_validation/validate_esp32_tests.cpp` - テスト妥当性確認
 - `docs/TOOLS_AND_TESTING.md` - 全体テスト戦略
 

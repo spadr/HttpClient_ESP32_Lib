@@ -19,7 +19,7 @@
 cd docker && docker-compose -f test-services.yml up -d && cd ..
 
 # 3. 全テストを実行
-./scripts/run-tests.sh -l all
+./scripts/run-all-tests.sh -l all
 ```
 
 ## テストアーキテクチャ
@@ -58,31 +58,35 @@ pio test -e native --filter "unit/utils/*"     # ユーティリティテスト�
 #### 高機能テストランナー（推奨）
 ```bash
 # 全テスト実行
-./scripts/run-tests.sh -l all
+./scripts/run-all-tests.sh -l all
 
 # 特定レイヤーのみ実行
-./scripts/run-tests.sh -l 1        # ユニットテストのみ
-./scripts/run-tests.sh -l 2        # 統合テストのみ
-./scripts/run-tests.sh -l 3        # E2Eテストのみ
+./scripts/run-unit-tests.sh        # ユニットテストのみ
+./scripts/run-integration-tests.sh # 統合テストのみ
+./scripts/run-e2e-tests.sh         # E2Eテストのみ
 
-# オプション
-./scripts/run-tests.sh -l all -v   # 詳細出力
-./scripts/run-tests.sh -l all -c   # クリーンビルド
+# オプション（各スクリプト共通）
+./scripts/run-all-tests.sh -l all -v   # 詳細出力 (-v/--verbose)
+./scripts/run-all-tests.sh -l all -c   # クリーンビルド (-c/--clean)
+
+# 個別スクリプトでのオプション使用例
+./scripts/run-unit-tests.sh -c -v      # クリーンビルドして詳細出力
+./scripts/run-e2e-tests.sh -c          # E2Eテストをクリーンビルドして実行
 ```
 
 #### Dockerローカルテスト
 ```bash
 # 通常実行
-./scripts/test-local.sh
+./scripts/run-all-tests.sh
 
 # レコーディングモード（E2Eテスト用）
-./scripts/test-local.sh --record
+RECORD_MODE=1 ./scripts/run-all-tests.sh -l 3
 ```
 
 ### 簡易テストランナー
 ```bash
-# 全テスト実行（PlatformIOなしでも動作）
-./tools/testing/run_all_tests.sh
+# 全テスト実行
+./scripts/run-all-tests.sh
 ```
 
 ### 手動コンパイル（PlatformIOなしの場合）

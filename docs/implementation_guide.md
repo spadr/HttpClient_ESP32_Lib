@@ -573,11 +573,11 @@ std::string HttpRecorder::generateRequestKey(const Request& request) {
 
 ```bash
 #!/bin/bash
-# scripts/test-local.sh
+# scripts/run-all-tests.sh
 
 set -e
 
-echo "🚀 Starting local test suite..."
+echo "🚀 Starting test suite..."
 
 # テスト環境の起動
 echo "📦 Starting mock services..."
@@ -686,10 +686,10 @@ echo "🎉 CI test suite completed successfully!"
 ./scripts/setup-test-structure.sh
 
 # テスト実行
-./scripts/test-local.sh
+./scripts/run-all-tests.sh
 
 # 新しいセッションを記録
-./scripts/test-local.sh --record
+RECORD_MODE=1 ./scripts/run-all-tests.sh -l 3
 ```
 
 ### CI/CD
