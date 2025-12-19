@@ -66,7 +66,7 @@ fi
 
 # Function to check if MockServer is running
 check_mockserver() {
-    if curl -f http://localhost:1080/mockserver/status >/dev/null 2>&1; then
+    if curl -s -X PUT http://localhost:1080/mockserver/status >/dev/null 2>&1; then
         return 0
     else
         return 1
@@ -88,6 +88,22 @@ start_mockserver() {
     done
     
     echo -e "${RED}❌ MockServer failed to start${NC}"
+
+    # Try to clean up and restart once
+    echo -e "${YELLOW}🔄 Attempting to cleanup and restart...${NC}"
+    docker-compose -f docker/test-services.yml down
+    docker-compose -f docker/test-services.yml up -d mockserver
+    
+    echo "Waiting for MockServer to restart..."
+    for i in {1..30}; do
+        if check_mockserver; then
+            echo -e "${GREEN}✅ MockServer is ready after restart${NC}"
+            return 0
+        fi
+        sleep 2
+    done
+    
+    echo -e "${RED}❌ MockServer failed to start even after cleanup${NC}"
     return 1
 }
 
