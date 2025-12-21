@@ -17,4 +17,7 @@ namespace ConfigExample
 
     extern const char *client_key;
 
+    // E2Eテスト用認証トークン
+    extern const char *e2e_token;
+
 } // namespace ConfigExample
