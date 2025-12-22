@@ -27,7 +27,7 @@ void setup()
     Serial.println(WiFi.localIP());
 
     // HTTP時刻同期 (自前サーバー)
-    if (HttpClient::syncTime("https://e2e.canaspad.net/time", Config::e2e_token))
+    if (HttpClient::syncTime("https://timestamp.canaspad.net/"))
     {
         struct tm timeinfo;
         if (getLocalTime(&timeinfo))

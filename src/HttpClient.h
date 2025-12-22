@@ -52,7 +52,7 @@ namespace canaspad
         Result<HttpResult> sendStreaming(const Request &request, ChunkCallback chunkCallback);
 
         // Time synchronization
-        static bool syncTime(const std::string &timeUrl = "https://e2e.canaspad.net/time", const std::string &token = "");
+        static bool syncTime(const std::string &timeUrl = "https://timestamp.canaspad.net/");
 
         Connection *getConnection() const;
 

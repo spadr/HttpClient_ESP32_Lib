@@ -453,7 +453,7 @@ void setup()
     Serial.println(WiFi.localIP());
 
     // Sync time using HTTP (more reliable for E2E tests behind firewalls)
-    if (HttpClient::syncTime("https://e2e.canaspad.net/time", Config::e2e_token))
+    if (HttpClient::syncTime("https://timestamp.canaspad.net/"))
     {
         struct tm timeinfo;
         if (getLocalTime(&timeinfo))

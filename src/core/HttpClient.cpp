@@ -27,7 +27,7 @@ namespace canaspad
 {
 
     // Static implementation of time synchronization
-    bool HttpClient::syncTime(const std::string &timeUrl, const std::string &token)
+    bool HttpClient::syncTime(const std::string &timeUrl)
     {
 #ifdef ARDUINO_ARCH_NATIVE
         Serial.println("Native environment - skipping time sync");
@@ -48,10 +48,9 @@ namespace canaspad
         request.setUrl(timeUrl)
             .setMethod(HttpMethod::GET);
 
-        if (!token.empty())
-        {
-            request.addHeader("X-E2E-Token", token);
-        }
+        // 時刻同期サーバーはUser-Agentを要求するため追加
+        // HttpClient-ESP32-Lib/1.0.0
+        request.addHeader("User-Agent", "HttpClient-ESP32-Lib/1.0.0");
 
         // Measure round-trip time for better accuracy
         unsigned long startMillis = millis();
@@ -806,6 +805,22 @@ namespace canaspad
         }
         // Host: ヘッダーを追加 ホストとポートを含める
         oss << "Host: " << host << ":" << port << "\r\n";
+
+        // User-Agentが指定されていない場合はデフォルトを追加
+        bool hasUserAgent = false;
+        for (const auto &header : request.getHeaders())
+        {
+            if (Utils::caseInsensitiveCompare(header.first, "User-Agent"))
+            {
+                hasUserAgent = true;
+                break;
+            }
+        }
+        if (!hasUserAgent)
+        {
+            oss << "User-Agent: HttpClient-ESP32-Lib/1.0.0\r\n";
+        }
+
         const auto &multipartFormData = request.getMultipartFormData();
 
         // プロキシ認証
