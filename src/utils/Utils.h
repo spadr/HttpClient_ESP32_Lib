@@ -28,6 +28,7 @@ namespace canaspad
         static std::vector<std::string> extractHeaders(const std::unordered_map<std::string, std::string> &headers, const std::string &key);
         static size_t extractContentLength(const std::unordered_map<std::string, std::string> &headers);
         static void parseHeaders(const std::string &headers, HttpResult &result);
+        static bool caseInsensitiveCompare(const std::string &str1, const std::string &str2);
     };
 
 } // namespace canaspad

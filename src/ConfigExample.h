@@ -20,4 +20,7 @@ namespace ConfigExample
     // E2Eテスト用認証トークン
     extern const char *e2e_token;
 
+    // Google Trust Services Root R4
+    extern const char *gts_root_r4;
+
 } // namespace ConfigExample

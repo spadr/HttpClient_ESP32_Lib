@@ -51,6 +51,9 @@ namespace canaspad
         using ChunkCallback = std::function<void(const char *, size_t)>;
         Result<HttpResult> sendStreaming(const Request &request, ChunkCallback chunkCallback);
 
+        // Time synchronization
+        static bool syncTime(const std::string &timeUrl = "https://e2e.canaspad.net/time", const std::string &token = "");
+
         Connection *getConnection() const;
 
     private:

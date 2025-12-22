@@ -1,139 +1,100 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <unity.h>
-#include "../ConfigExample.h"
+#include "../Config.h" // ConfigExample.h ではなく Config.h を使用
 
-using namespace ConfigExample;
-
-#include "../src/HttpClient.h"
-#include "../src/core/Request.h"
+#include "../HttpClient.h"
+#include "../core/Request.h"
 
 using namespace canaspad;
 
-// E2Eテスト関数の宣言
-void run_e2e_real_server_tests();
-
-void setUp(void) {
-    // 各テスト前の初期化
-}
-
-void tearDown(void) {
-    // 各テスト後のクリーンアップ
-}
-
-void setup() {
+void setup()
+{
     delay(2000); // シリアルモニタ接続待ち
-    
+
     Serial.begin(115200);
-    Serial.println("\n=== HttpClient ESP32 Library - E2E Tests ===");
-    
+    Serial.println("\n=== HttpClient ESP32 Library - Main Execution ===");
+
     // WiFi接続
     Serial.println("Connecting to WiFi...");
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED) {
+    WiFi.begin(Config::ssid, Config::password);
+    while (WiFi.status() != WL_CONNECTED)
+    {
         delay(500);
         Serial.print(".");
     }
     Serial.println("\nWiFi connected!");
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
-    
-    // NTP時刻同期
-    Serial.println("Synchronizing time with NTP server...");
-    configTime(gmt_offset_sec, daylight_offset_sec, ntp_host);
+
+    // HTTP時刻同期 (自前サーバー)
+    if (HttpClient::syncTime("https://e2e.canaspad.net/time", Config::e2e_token))
+    {
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo))
+        {
+            Serial.println("Time synchronized:");
+            Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+        }
+    }
+    else
+    {
+        Serial.println("Warning: Time sync failed. SSL verification might fail.");
+    }
+
+    // NTP同期を使用する場合
+    /*
+    configTime(9 * 3600, 0, "ntp.nict.jp", "time.google.com", "ntp.jst.mfeed.ad.jp");
+    Serial.println("Waiting for NTP time sync...");
     struct tm timeinfo;
-    while (!getLocalTime(&timeinfo)) {
-        Serial.println("Failed to obtain time. Retrying...");
-        delay(1000);
+
+    // 時刻が設定されるまで待機（NTP同期はバックグラウンドで行われるためポーリングが必要）
+    while (!getLocalTime(&timeinfo))
+    {
+        Serial.print(".");
+        delay(500);
     }
-    Serial.println("Time synchronized:");
+    Serial.println("\nTime synchronized via NTP:");
     Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-    
-    // Unity テストフレームワーク開始
-    UNITY_BEGIN();
-    
-    // E2Eテスト実行
-    run_e2e_real_server_tests();
-    
-    UNITY_END();
-}
+    */
 
-void loop() {
-    delay(1000);
-}
+    // HTTPS POSTリクエストのデモ実行
+    Serial.println("\n--- Sending Demo POST Request ---");
 
-// E2Eテスト実装
-void test_basic_http_connection() {
-    Serial.println("Testing basic HTTP connection...");
-    TEST_ASSERT_TRUE(WiFi.status() == WL_CONNECTED);
-    
-    HttpClient client;
+    ClientOptions options;
+    options.followRedirects = true;
+    options.rootCA = Config::gts_root_r4; // Google Trust Services Root R4
+    HttpClient client(options, false);
+
+    std::string postData = "{\"test\":\"data\",\"timestamp\":\"" +
+                           std::to_string(millis()) + "\"}";
+
     Request request;
-    request.setUrl("https://httpbin.org/get");
-    request.setMethod(canaspad::HttpMethod::GET);
-    
+    // HTTPS POSTに変更し、Cloudflare Workersのエンドポイントを指定
+    request.setUrl("https://e2e.canaspad.net/post")
+        .setMethod(canaspad::HttpMethod::POST)
+        .addHeader("X-E2E-Token", Config::e2e_token)
+        .addHeader("Content-Type", "application/json")
+        .setBody(postData);
+
+    Serial.println("Target: https://e2e.canaspad.net/post");
     auto result = client.send(request);
-    TEST_ASSERT_TRUE(result.isSuccess());
-    
-    if (result.isSuccess()) {
+
+    if (result.isSuccess())
+    {
         auto response = result.value();
-        TEST_ASSERT_TRUE(response.statusCode == 200);
-        Serial.printf("✓ HTTP GET successful: %d\n", response.statusCode);
-    } else {
-        Serial.printf("✗ HTTP GET failed\n");
-        TEST_FAIL();
+        Serial.printf("Status Code: %d\n", response.statusCode);
+        Serial.printf("Response Body: %s\n", response.body.c_str());
     }
+    else
+    {
+        Serial.printf("Error: %s (Code: %d)\n", result.error().message.c_str(), (int)result.error().code);
+    }
+
+    Serial.println("\n--- Demo Finished ---");
 }
 
-void test_https_connection() {
-    Serial.println("Testing HTTPS connection...");
-    TEST_ASSERT_TRUE(WiFi.status() == WL_CONNECTED);
-    
-    HttpClient client;
-    Request request;
-    request.setUrl("https://httpbin.org/get");
-    request.setMethod(canaspad::HttpMethod::GET);
-    
-    auto result = client.send(request);
-    TEST_ASSERT_TRUE(result.isSuccess());
-    
-    if (result.isSuccess()) {
-        auto response = result.value();
-        TEST_ASSERT_TRUE(response.statusCode == 200);
-        Serial.printf("✓ HTTPS GET successful: %d\n", response.statusCode);
-    } else {
-        Serial.printf("✗ HTTPS GET failed\n");
-        TEST_FAIL();
-    }
-}
-
-void test_http_post() {
-    Serial.println("Testing HTTP POST...");
-    TEST_ASSERT_TRUE(WiFi.status() == WL_CONNECTED);
-    
-    HttpClient client;
-    Request request;
-    request.setUrl("https://httpbin.org/post");
-    request.setMethod(canaspad::HttpMethod::POST);
-    request.setBody("{\"test\":\"data\"}");
-    request.addHeader("Content-Type", "application/json");
-    
-    auto result = client.send(request);
-    TEST_ASSERT_TRUE(result.isSuccess());
-    
-    if (result.isSuccess()) {
-        auto response = result.value();
-        TEST_ASSERT_TRUE(response.statusCode == 200);
-        Serial.printf("✓ HTTP POST successful: %d\n", response.statusCode);
-    } else {
-        Serial.printf("✗ HTTP POST failed\n");
-        TEST_FAIL();
-    }
-}
-
-void run_e2e_real_server_tests() {
-    Serial.println("\n=== Running E2E Real Server Tests ===");
-    RUN_TEST(test_basic_http_connection);
-    RUN_TEST(test_https_connection);
-    RUN_TEST(test_http_post);
+void loop()
+{
+    delay(10000);
+    Serial.println("Looping...");
 }

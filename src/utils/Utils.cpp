@@ -248,7 +248,8 @@ namespace canaspad
     void Utils::parseCookie(const std::string &setCookieHeader, Cookie &cookie, const std::string &requestUrl)
     {
         // 空文字列チェック
-        if (setCookieHeader.empty()) {
+        if (setCookieHeader.empty())
+        {
             return;
         }
 
@@ -256,27 +257,33 @@ namespace canaspad
         std::string token;
 
         // クッキー名を取得
-        if (!std::getline(iss, token, '=')) {
+        if (!std::getline(iss, token, '='))
+        {
             return;
         }
         token.erase(0, token.find_first_not_of(" \t"));
         token.erase(token.find_last_not_of(" \t") + 1);
-        if (token.empty()) {
+        if (token.empty())
+        {
             return;
         }
         cookie.name = token;
 
         // クッキー値を取得
-        if (!std::getline(iss, token, ';')) {
+        if (!std::getline(iss, token, ';'))
+        {
             // セミコロンがない場合は残り全部が値
             iss.clear();
             iss.seekg(0);
             std::getline(iss, token);
             size_t equalPos = token.find('=');
-            if (equalPos != std::string::npos) {
+            if (equalPos != std::string::npos)
+            {
                 cookie.value = token.substr(equalPos + 1);
             }
-        } else {
+        }
+        else
+        {
             cookie.value = token;
         }
 
@@ -291,7 +298,7 @@ namespace canaspad
         {
             token.erase(0, token.find_first_not_of(" \t"));
             token.erase(token.find_last_not_of(" \t") + 1);
-            
+
             if (token.substr(0, 7) == "Domain=")
             {
                 cookie.domain = token.substr(7);
@@ -371,6 +378,19 @@ namespace canaspad
 
             parseHeader(line, result);
         }
+    }
+
+    bool Utils::caseInsensitiveCompare(const std::string &str1, const std::string &str2)
+    {
+        if (str1.length() != str2.length())
+        {
+            return false;
+        }
+        return std::equal(str1.begin(), str1.end(), str2.begin(),
+                          [](char a, char b)
+                          {
+                              return tolower(a) == tolower(b);
+                          });
     }
 
 } // namespace canaspad

@@ -37,6 +37,14 @@ export default {
 
     // --- Endpoints ---
 
+    // 0. Connectivity Check (Simple Ping)
+    if (url.pathname === '/ping') {
+      return new Response('pong', { 
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    }
+
     // 1. GET Request Check
     if (url.pathname === '/get') {
       return jsonResponse({
@@ -129,6 +137,15 @@ export default {
         } else {
             return Response.redirect(`${url.origin}/redirect/${n - 1}`, 302);
         }
+    }
+
+    // 7. Time Check (Self-hosted NTP alternative)
+    if (url.pathname === '/time') {
+      const now = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
+      return new Response(now.toString(), {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' }
+      });
     }
 
     // Default: 404
