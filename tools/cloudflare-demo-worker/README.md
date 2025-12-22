@@ -10,7 +10,7 @@ It provides simple echo endpoints without authentication requirements, used by t
 
 ## Deployment
 
-Deploy to `demo.canaspad.net`:
+Deploy to `demo1.canaspad.net/post`:
 
 ```bash
 npx wrangler deploy

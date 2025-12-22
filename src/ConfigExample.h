@@ -4,23 +4,8 @@ namespace ConfigExample
 {
     extern const char *ssid;
     extern const char *password;
-    extern const char *api_url;
-    extern const char *api_username;
-    extern const char *api_password;
-    extern const char *ntp_host;
     extern const long gmt_offset_sec;
     extern const int daylight_offset_sec;
-
-    extern const char *isrg_root_x1;
-
-    extern const char *client_cert;
-
-    extern const char *client_key;
-
-    // E2Eテスト用認証トークン
-    extern const char *e2e_token;
-
-    // Google Trust Services Root R4
     extern const char *gts_root_r4;
 
 } // namespace ConfigExample

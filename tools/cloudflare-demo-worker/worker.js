@@ -4,13 +4,19 @@
  * Simple Cloudflare Worker for library demonstration purposes.
  * Publicly accessible endpoint (no auth required).
  * 
- * Endpoint: https://demo.canaspad.net/
+ * Endpoint: https://demo1.canaspad.net/
  */
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const headers = Object.fromEntries(request.headers);
+
+    // Check User-Agent
+    const userAgent = request.headers.get('User-Agent');
+    if (!userAgent || !userAgent.includes('HttpClient-ESP32-Lib')) {
+        return new Response('Forbidden', { status: 403 });
+    }
 
     // Add CORS headers
     const corsHeaders = {
@@ -41,7 +47,7 @@ export default {
       }
 
       return new Response(JSON.stringify({
-        message: 'Hello from demo.canaspad.net!',
+        message: 'Hello from demo1.canaspad.net/post!',
         received: {
           method: 'POST',
           headers: headers,
