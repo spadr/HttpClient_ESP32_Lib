@@ -69,14 +69,13 @@ void setup()
                            std::to_string(millis()) + "\"}";
 
     Request request;
-    // HTTPS POSTに変更し、Cloudflare Workersのエンドポイントを指定
-    request.setUrl("https://e2e.canaspad.net/post")
+    // HTTPS POSTに変更し、デモ用パブリックエンドポイントを指定 (トークン不要)
+    request.setUrl("https://demo.canaspad.net/post")
         .setMethod(canaspad::HttpMethod::POST)
-        .addHeader("X-E2E-Token", Config::e2e_token)
         .addHeader("Content-Type", "application/json")
         .setBody(postData);
 
-    Serial.println("Target: https://e2e.canaspad.net/post");
+    Serial.println("Target: https://demo.canaspad.net/post");
     auto result = client.send(request);
 
     if (result.isSuccess())
