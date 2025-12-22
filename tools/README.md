@@ -7,7 +7,6 @@ This directory contains various tools for development, testing, and validation o
 ```
 tools/
 ├── setup/           # Environment setup tools
-├── testing/         # Test execution tools
 └── validation/      # Code validation and verification tools
 ```
 
@@ -36,18 +35,6 @@ python3 tools/validation/check_includes.py
 - **`get-platformio.py`** - PlatformIO installer
   ```bash
   python3 tools/setup/get-platformio.py
-  ```
-
-### Testing Tools (`tools/testing/`)
-
-- **`run_all_tests.sh`** - Simple test runner for all tests
-  ```bash
-  ./tools/testing/run_all_tests.sh
-  ```
-
-- **`test_runner.py`** - Python-based test infrastructure checker
-  ```bash
-  python3 tools/testing/test_runner.py
   ```
 
 ### Validation Tools (`tools/validation/`)

@@ -43,7 +43,7 @@ check_mockserver() {
 # Function to start MockServer
 start_mockserver() {
     echo -e "${YELLOW}🐳 Starting MockServer...${NC}"
-    docker-compose up -d mockserver
+    docker-compose -f docker/test-services.yml up -d mockserver
     
     echo "Waiting for MockServer to be ready..."
     for i in {1..30}; do

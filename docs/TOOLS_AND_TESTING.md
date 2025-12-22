@@ -153,9 +153,6 @@ python3 tools/validation/check_includes.py
 
 # テスト重複チェック
 python3 tools/validation/check_test_duplicates.py
-
-# テストインフラストラクチャ確認
-python3 tools/testing/test_runner.py
 ```
 
 ## トラブルシューティング
