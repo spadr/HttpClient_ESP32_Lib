@@ -31,8 +31,16 @@ jobs:
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
+      - name: Create Dummy Config
+        run: |
+          mkdir -p src test
+          echo "#pragma once" > src/Config.h
+          echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; }" >> src/Config.h
+          echo "#pragma once" > test/Config.h
+          echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; const char* e2e_token = \"dummy\"; }" >> test/Config.h
+
       - name: Run Unit Tests
-        run: pio test -e native --verbose
+        run: pio test -e test_unit --verbose
 
       - name: Upload Unit Test Results
         uses: actions/upload-artifact@v4
@@ -71,12 +79,20 @@ jobs:
           sudo apt-get install -y libcurl4-openssl-dev
           pip install --upgrade platformio
 
+      - name: Create Dummy Config
+        run: |
+          mkdir -p src test
+          echo "#pragma once" > src/Config.h
+          echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; }" >> src/Config.h
+          echo "#pragma once" > test/Config.h
+          echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; const char* e2e_token = \"dummy\"; }" >> test/Config.h
+
       - name: Wait for MockServer
         run: |
           timeout 60 bash -c 'until curl -f http://localhost:1080/mockserver/status; do sleep 2; done'
 
       - name: Run Integration Tests
-        run: pio test -e native_integration --verbose
+        run: pio test -e test_integration --verbose
 
       - name: Upload Integration Test Results
         uses: actions/upload-artifact@v4
