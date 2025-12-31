@@ -40,10 +40,29 @@ check_mockserver() {
     fi
 }
 
+# Function to check for docker compose command
+get_compose_cmd() {
+    if command -v docker-compose &> /dev/null; then
+        echo "docker-compose"
+    elif docker compose version &> /dev/null; then
+        echo "docker compose"
+    else
+        echo ""
+    fi
+}
+
 # Function to start MockServer
 start_mockserver() {
-    echo -e "${YELLOW}🐳 Starting MockServer...${NC}"
-    docker-compose -f docker/test-services.yml up -d mockserver
+    COMPOSE_CMD=$(get_compose_cmd)
+    
+    if [ -z "$COMPOSE_CMD" ]; then
+        echo -e "${RED}Error: neither 'docker-compose' nor 'docker compose' found.${NC}"
+        echo "Please install Docker Compose."
+        return 1
+    fi
+
+    echo -e "${YELLOW}🐳 Starting MockServer using $COMPOSE_CMD...${NC}"
+    $COMPOSE_CMD -f docker/test-services.yml up -d mockserver
     
     echo "Waiting for MockServer to be ready..."
     for i in {1..30}; do
@@ -58,8 +77,8 @@ start_mockserver() {
     
     # Try to clean up and restart once
     echo -e "${YELLOW}🔄 Attempting to cleanup and restart...${NC}"
-    docker-compose -f docker/test-services.yml down
-    docker-compose -f docker/test-services.yml up -d mockserver
+    $COMPOSE_CMD -f docker/test-services.yml down
+    $COMPOSE_CMD -f docker/test-services.yml up -d mockserver
     
     echo "Waiting for MockServer to restart..."
     for i in {1..30}; do
