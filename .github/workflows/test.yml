@@ -40,7 +40,9 @@ jobs:
           echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; const char* e2e_token = \"dummy\"; }" >> test/Config.h
 
       - name: Run Unit Tests
-        run: pio test -e test_unit --verbose
+        run: |
+          chmod +x scripts/run-unit-tests.sh
+          ./scripts/run-unit-tests.sh --verbose
 
       - name: Upload Unit Test Results
         uses: actions/upload-artifact@v4
@@ -54,11 +56,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Layer 2 - Integration Tests
 
-    services:
-      mockserver:
-        image: mockserver/mockserver:5.15.0
-        ports:
-          - 1080:1080
+    # services: MockServer service removed to allow run-integration-tests.sh to manage it via docker-compose
+    # This ensures consistency between local dev and CI environment
 
     steps:
       - uses: actions/checkout@v4
@@ -83,11 +82,13 @@ jobs:
           echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; const char* e2e_token = \"dummy\"; }" >> test/Config.h
 
       - name: Wait for MockServer
-        run: |
-          timeout 60 bash -c 'until curl -f http://localhost:1080/mockserver/status; do sleep 2; done'
+        # Removed: run-integration-tests.sh handles wait logic internally
+        run: echo "MockServer wait logic is handled by the script"
 
       - name: Run Integration Tests
-        run: pio test -e test_integration --verbose
+        run: |
+          chmod +x scripts/run-integration-tests.sh
+          ./scripts/run-integration-tests.sh --verbose
 
       - name: Upload Integration Test Results
         uses: actions/upload-artifact@v4
