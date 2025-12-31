@@ -6,6 +6,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cstdint>
+#include "../../Config.h" // test/Config.hをインクルード
 
 // Mock Arduino types for compilation validation
 typedef uint8_t byte;
@@ -64,11 +66,10 @@ public:
     static void begin(const char *ssid, const char *password) {}
 };
 
-// Mock Config namespace
+// Mock Config namespace extension for additional values
 namespace Config
 {
-    const char *ssid = "wifi_achichi_spot";
-    const char *password = "banana_oishi-";
+    // test/Config.h で定義されていない、または追加で必要な値がある場合ここに追加
     const char *isrg_root_x1 = "-----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----";
 }
 
@@ -111,6 +112,7 @@ namespace canaspad_mock
         void setCACert(const char *cert) {}
         void setBody(const std::string &body) {}
         void setHeader(const std::string &key, const std::string &value) {}
+        void addHeader(const std::string &key, const std::string &value) {}
     };
 
     class HttpClient
@@ -137,7 +139,9 @@ bool test_basic_http_connection()
     TEST_ASSERT_TRUE(MockWiFi::status() == WL_CONNECTED);
 
     HttpClient client;
-    Request request("https://httpbin.org/get");
+    // Cloudflare E2E Worker endpoint (compatible with httpbin.org)
+    Request request("https://e2e.canaspad.net/get");
+    request.setHeader("X-E2E-Token", Config::e2e_token); // Use token from Config
 
     auto result = client.GET(request);
     TEST_ASSERT_TRUE(result.isOk());
@@ -163,8 +167,10 @@ bool test_https_connection()
     TEST_ASSERT_TRUE(MockWiFi::status() == WL_CONNECTED);
 
     HttpClient client;
-    Request request("https://httpbin.org/get");
+    // Cloudflare E2E Worker endpoint (compatible with httpbin.org)
+    Request request("https://e2e.canaspad.net/get");
     request.setCACert(Config::isrg_root_x1);
+    request.addHeader("X-E2E-Token", Config::e2e_token); // Use token from Config
 
     auto result = client.GET(request);
     TEST_ASSERT_TRUE(result.isOk());
@@ -190,9 +196,11 @@ bool test_http_post()
     TEST_ASSERT_TRUE(MockWiFi::status() == WL_CONNECTED);
 
     HttpClient client;
-    Request request("https://httpbin.org/post");
+    // Cloudflare E2E Worker endpoint (compatible with httpbin.org)
+    Request request("https://e2e.canaspad.net/post");
     request.setBody("{\"test\":\"data\"}");
     request.setHeader("Content-Type", "application/json");
+    request.setHeader("X-E2E-Token", Config::e2e_token); // Use token from Config
 
     auto result = client.POST(request);
     TEST_ASSERT_TRUE(result.isOk());
