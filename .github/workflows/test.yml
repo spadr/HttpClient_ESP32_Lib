@@ -31,13 +31,26 @@ jobs:
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
-      - name: Create Dummy Config
+      - name: Setup Config Files
+        env:
+          E2E_TOKEN: ${{ secrets.E2E_TOKEN }}
         run: |
           mkdir -p src test
-          echo "#pragma once" > src/Config.h
-          echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; }" >> src/Config.h
-          echo "#pragma once" > test/Config.h
-          echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; const char* e2e_token = \"dummy\"; }" >> test/Config.h
+
+          # 1. Setup src/Config.h and src/Config.cpp from ConfigExample
+          cp src/ConfigExample.h src/Config.h
+          cp src/Config.cpp src/Config.cpp.bak
+
+          # Replace ConfigExample namespace with Config
+          sed -i 's/ConfigExample/Config/g' src/Config.h
+          sed -i 's/ConfigExample/Config/g' src/Config.cpp
+          sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
+
+          # 2. Setup test/Config.h from ConfigExample
+          cp test/ConfigExample.h test/Config.h
+          
+          # Inject E2E_TOKEN
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
 
       - name: Run Unit Tests
         run: |
@@ -73,13 +86,26 @@ jobs:
           sudo apt-get install -y libcurl4-openssl-dev
           pip install --upgrade platformio
 
-      - name: Create Dummy Config
+      - name: Setup Config Files
+        env:
+          E2E_TOKEN: ${{ secrets.E2E_TOKEN }}
         run: |
           mkdir -p src test
-          echo "#pragma once" > src/Config.h
-          echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; }" >> src/Config.h
-          echo "#pragma once" > test/Config.h
-          echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; const char* e2e_token = \"dummy\"; }" >> test/Config.h
+
+          # 1. Setup src/Config.h and src/Config.cpp from ConfigExample
+          cp src/ConfigExample.h src/Config.h
+          cp src/Config.cpp src/Config.cpp.bak
+
+          # Replace ConfigExample namespace with Config
+          sed -i 's/ConfigExample/Config/g' src/Config.h
+          sed -i 's/ConfigExample/Config/g' src/Config.cpp
+          sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
+
+          # 2. Setup test/Config.h from ConfigExample
+          cp test/ConfigExample.h test/Config.h
+          
+          # Inject E2E_TOKEN
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
 
       - name: Wait for MockServer
         # Removed: run-integration-tests.sh handles wait logic internally
@@ -114,12 +140,26 @@ jobs:
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
-      - name: Create Dummy Config
+      - name: Setup Config Files
+        env:
+          E2E_TOKEN: ${{ secrets.E2E_TOKEN }}
         run: |
-          echo "#pragma once" > src/Config.h
-          echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; }" >> src/Config.h
-          echo "#pragma once" > test/Config.h
-          echo "namespace Config { const char* ssid = \"dummy\"; const char* password = \"dummy\"; const char* e2e_token = \"dummy\"; }" >> test/Config.h
+          mkdir -p src test
+
+          # 1. Setup src/Config.h and src/Config.cpp from ConfigExample
+          cp src/ConfigExample.h src/Config.h
+          cp src/Config.cpp src/Config.cpp.bak
+
+          # Replace ConfigExample namespace with Config
+          sed -i 's/ConfigExample/Config/g' src/Config.h
+          sed -i 's/ConfigExample/Config/g' src/Config.cpp
+          sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
+
+          # 2. Setup test/Config.h from ConfigExample
+          cp test/ConfigExample.h test/Config.h
+          
+          # Inject E2E_TOKEN
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
 
       - name: Build ESP32 Tests
         run: |
