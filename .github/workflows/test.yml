@@ -194,23 +194,31 @@ jobs:
 
       - name: Generate Test Summary
         run: |
+          # Define a function to output to both file and job summary
+          log_summary() {
+            echo "$1" >> test-summary.md
+            echo "$1" >> $GITHUB_STEP_SUMMARY
+          }
+
           echo "# Test Results Summary" > test-summary.md
-          echo "" >> test-summary.md
-          echo "## Layer 1: Unit Tests" >> test-summary.md
+          echo "# Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          
+          log_summary ""
+          log_summary "## Layer 1: Unit Tests"
           if [ -d "./unit-results" ]; then
-            echo "✅ Unit tests executed" >> test-summary.md
+            log_summary "✅ Unit tests executed"
           else
-            echo "❌ Unit tests failed" >> test-summary.md
+            log_summary "❌ Unit tests failed"
           fi
-          echo "" >> test-summary.md
-          echo "## Layer 2: Integration Tests" >> test-summary.md
+          log_summary ""
+          log_summary "## Layer 2: Integration Tests"
           if [ -d "./integration-results" ]; then
-            echo "✅ Integration tests executed" >> test-summary.md
+            log_summary "✅ Integration tests executed"
           else
-            echo "❌ Integration tests failed" >> test-summary.md
+            log_summary "❌ Integration tests failed"
           fi
-          echo "" >> test-summary.md
-          echo "Generated at: $(date)" >> test-summary.md
+          log_summary ""
+          log_summary "Generated at: $(date)"
 
       - name: Upload Test Summary
         uses: actions/upload-artifact@v4
