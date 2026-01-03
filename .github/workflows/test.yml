@@ -178,6 +178,7 @@ jobs:
         with:
           name: unit-test-results
           path: ./unit-results/
+        continue-on-error: true
 
       - name: Download Integration Test Results
         uses: actions/download-artifact@v4
