@@ -53,9 +53,12 @@ jobs:
           sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
 
       - name: Run Unit Tests
+        shell: bash
         run: |
+          set -o pipefail
           chmod +x scripts/run-unit-tests.sh
-          ./scripts/run-unit-tests.sh --verbose
+          mkdir -p .pio/test
+          ./scripts/run-unit-tests.sh --verbose 2>&1 | tee .pio/test/test_result.txt
 
       - name: Upload Unit Test Results
         uses: actions/upload-artifact@v4
@@ -112,9 +115,12 @@ jobs:
         run: echo "MockServer wait logic is handled by the script"
 
       - name: Run Integration Tests
+        shell: bash
         run: |
+          set -o pipefail
           chmod +x scripts/run-integration-tests.sh
-          ./scripts/run-integration-tests.sh --verbose
+          mkdir -p .pio/test
+          ./scripts/run-integration-tests.sh --verbose 2>&1 | tee .pio/test/test_result.txt
 
       - name: Upload Integration Test Results
         uses: actions/upload-artifact@v4
