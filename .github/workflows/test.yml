@@ -42,8 +42,8 @@ jobs:
           cp src/Config.cpp src/Config.cpp.bak
 
           # Replace ConfigExample namespace with Config
-          sed -i 's/ConfigExample/Config/g' src/Config.h
-          sed -i 's/ConfigExample/Config/g' src/Config.cpp
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.h
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.cpp
           sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
 
           # 2. Setup test/Config.h from ConfigExample
@@ -97,8 +97,8 @@ jobs:
           cp src/Config.cpp src/Config.cpp.bak
 
           # Replace ConfigExample namespace with Config
-          sed -i 's/ConfigExample/Config/g' src/Config.h
-          sed -i 's/ConfigExample/Config/g' src/Config.cpp
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.h
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.cpp
           sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
 
           # 2. Setup test/Config.h from ConfigExample
@@ -151,8 +151,8 @@ jobs:
           cp src/Config.cpp src/Config.cpp.bak
 
           # Replace ConfigExample namespace with Config
-          sed -i 's/ConfigExample/Config/g' src/Config.h
-          sed -i 's/ConfigExample/Config/g' src/Config.cpp
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.h
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.cpp
           sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
 
           # 2. Setup test/Config.h from ConfigExample
