@@ -4,6 +4,9 @@
 #include <string>
 #include <cstdlib>
 
+// Unityがまだインクルードされていない場合のみ定義する
+#ifndef UNITY_BEGIN
+
 // Simple Unity-compatible test framework for native testing
 // Designed to mimic Unity's output format so PlatformIO can parse it
 static int test_count = 0;
@@ -104,3 +107,5 @@ inline int UNITY_END()
 #define TEST_IGNORE_MESSAGE(message)                           \
     std::cout << __FILE__ << ":0:IGNORED:" << message << "\n"; \
     return;
+
+#endif // UNITY_BEGIN
