@@ -22,6 +22,18 @@ namespace canaspad
             return result;
         }
 
+        result = validateHeaders(request);
+        if (result.isError())
+        {
+            return result;
+        }
+
+        result = validateBody(request);
+        if (result.isError())
+        {
+            return result;
+        }
+
         result = validateClientOptions(options);
         if (result.isError())
         {
@@ -48,7 +60,7 @@ namespace canaspad
         }
         if (scheme != "http" && scheme != "https")
         {
-            return Result<void>(ErrorInfo(ErrorCode::InvalidURL,
+            return Result<void>(ErrorInfo(ErrorCode::UnsupportedProtocol,
                                           "URL scheme must be 'http' or 'https'."));
         }
 
@@ -91,6 +103,11 @@ namespace canaspad
         {
             // スキーマのチェック
             auto scheme = Utils::extractScheme(options.proxyUrl);
+            if (scheme.empty())
+            {
+                return Result<void>(
+                    ErrorInfo(ErrorCode::InvalidProxyURL, "Proxy URL does not contain a scheme."));
+            }
             if (scheme != "http" && scheme != "https")
             {
                 return Result<void>(
@@ -110,6 +127,45 @@ namespace canaspad
                                               "Proxy URL contains an invalid port number."));
             }
         }
+
+        // リダイレクト設定のチェック
+        if (options.maxRedirects < 0)
+        {
+            return Result<void>(ErrorInfo(ErrorCode::InvalidOption, 
+                                          "Max redirects cannot be negative."));
+        }
+
+        // リトライ設定のチェック
+        if (options.maxRetries < 0)
+        {
+            return Result<void>(ErrorInfo(ErrorCode::InvalidOption, 
+                                          "Max retries cannot be negative."));
+        }
+
+        return Result<void>();
+    }
+
+    Result<void> RequestValidator::validateHeaders(const Request &request)
+    {
+        const auto& headers = request.getHeaders();
+        
+        for (const auto& header : headers)
+        {
+            // ヘッダー名が空の場合
+            if (header.first.empty())
+            {
+                return Result<void>(ErrorInfo(ErrorCode::InvalidHeader, 
+                                              "Header name cannot be empty."));
+            }
+        }
+        
+        return Result<void>();
+    }
+
+    Result<void> RequestValidator::validateBody(const Request &request)
+    {
+        // 現在の実装では、GETリクエストでもボディを許可する
+        // 必要に応じて制約を追加可能
         return Result<void>();
     }
 

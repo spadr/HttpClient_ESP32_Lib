@@ -1,0 +1,105 @@
+[
+  {
+    "description": "Basic GET endpoint",
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/health"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["application/json"],
+        "X-API-Version": ["1.0"]
+      },
+      "body": {
+        "status": "healthy",
+        "timestamp": "2024-01-01T00:00:00Z"
+      }
+    }
+  },
+  {
+    "description": "User creation endpoint",
+    "httpRequest": {
+      "method": "POST",
+      "path": "/api/users",
+      "headers": {
+        "Content-Type": ["application/json"]
+      }
+    },
+    "httpResponse": {
+      "statusCode": 201,
+      "headers": {
+        "Content-Type": ["application/json"],
+        "Location": ["http://localhost:1080/api/users/123"]
+      },
+      "body": {
+        "id": 123,
+        "status": "created",
+        "message": "User created successfully"
+      }
+    }
+  },
+  {
+    "description": "Redirect endpoint",
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/redirect"
+    },
+    "httpResponse": {
+      "statusCode": 302,
+      "headers": {
+        "Location": ["http://localhost:1080/api/final"]
+      }
+    }
+  },
+  {
+    "description": "Final redirect destination",
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/final"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["text/plain"]
+      },
+      "body": "Redirect successful"
+    }
+  },
+  {
+    "description": "Error endpoint",
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/error"
+    },
+    "httpResponse": {
+      "statusCode": 500,
+      "headers": {
+        "Content-Type": ["application/json"]
+      },
+      "body": {
+        "error": "Internal Server Error",
+        "code": 500,
+        "message": "Something went wrong"
+      }
+    }
+  },
+  {
+    "description": "Slow endpoint (for timeout testing)",
+    "httpRequest": {
+      "method": "GET",
+      "path": "/api/slow"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "Content-Type": ["text/plain"]
+      },
+      "body": "This response was delayed",
+      "delay": {
+        "timeUnit": "SECONDS",
+        "value": 5
+      }
+    }
+  }
+]

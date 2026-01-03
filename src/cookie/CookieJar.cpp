@@ -10,8 +10,18 @@ namespace canaspad
 
     void CookieJar::setCookie(const std::string &url, const std::string &setCookieHeader)
     {
+        // 空文字列チェック
+        if (setCookieHeader.empty()) {
+            return;
+        }
+
         Cookie cookie;
         Utils::parseCookie(setCookieHeader, cookie, url); // リクエストURLを渡す
+
+        // クッキー名が空の場合は無効
+        if (cookie.name.empty()) {
+            return;
+        }
 
         // クッキーをドメイン単位で保存
         m_cookies[cookie.domain].push_back(cookie);
@@ -25,6 +35,7 @@ namespace canaspad
         std::vector<std::string> result;
         time_t now = time(nullptr);
         std::string domain = Utils::extractHost(url); // URLからドメインを取得
+        std::string path = Utils::extractPath(url); // URLからパスを取得
 
         // ドメインに一致するクッキーを取得
         auto it = m_cookies.find(domain);
@@ -32,10 +43,22 @@ namespace canaspad
         {
             for (const auto &cookie : it->second)
             {
-                if (cookie.expires == 0 || cookie.expires >= now)
-                {
-                    result.push_back(cookie.name + "=" + cookie.value);
+                // 有効期限チェック
+                if (cookie.expires != 0 && cookie.expires < now) {
+                    continue;
                 }
+
+                // パスマッチングチェック
+                if (!cookie.path.empty() && path.find(cookie.path) != 0) {
+                    continue;
+                }
+
+                // セキュアフラグチェック (HTTPSの場合のみSecureクッキーを送信)
+                if (cookie.secure && url.find("https://") != 0) {
+                    continue;
+                }
+
+                result.push_back(cookie.name + "=" + cookie.value);
             }
         }
 

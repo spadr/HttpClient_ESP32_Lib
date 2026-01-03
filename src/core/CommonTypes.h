@@ -27,6 +27,7 @@ namespace canaspad
         int port = 0; // ポート番号 (0 の場合はスキームのデフォルトポートを使用)
         std::chrono::milliseconds retryDelay = std::chrono::seconds(1);
         bool verifySsl = true;
+        bool skipTimeCheck = false; // システム時刻未設定でも接続を許可するかどうか
         std::string proxyUrl;
         AuthType authType = AuthType::None;
         std::string username;

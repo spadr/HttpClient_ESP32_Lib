@@ -247,17 +247,58 @@ namespace canaspad
 
     void Utils::parseCookie(const std::string &setCookieHeader, Cookie &cookie, const std::string &requestUrl)
     {
+        // 空文字列チェック
+        if (setCookieHeader.empty())
+        {
+            return;
+        }
+
         std::istringstream iss(setCookieHeader);
         std::string token;
 
-        std::getline(iss, token, '=');
+        // クッキー名を取得
+        if (!std::getline(iss, token, '='))
+        {
+            return;
+        }
+        token.erase(0, token.find_first_not_of(" \t"));
+        token.erase(token.find_last_not_of(" \t") + 1);
+        if (token.empty())
+        {
+            return;
+        }
         cookie.name = token;
-        std::getline(iss, token, ';');
-        cookie.value = token;
 
+        // クッキー値を取得
+        if (!std::getline(iss, token, ';'))
+        {
+            // セミコロンがない場合は残り全部が値
+            iss.clear();
+            iss.seekg(0);
+            std::getline(iss, token);
+            size_t equalPos = token.find('=');
+            if (equalPos != std::string::npos)
+            {
+                cookie.value = token.substr(equalPos + 1);
+            }
+        }
+        else
+        {
+            cookie.value = token;
+        }
+
+        // デフォルト値を設定
+        cookie.path = "/";
+        cookie.secure = false;
+        cookie.httpOnly = false;
+        cookie.expires = 0;
+
+        // 属性を解析
         while (std::getline(iss, token, ';'))
         {
-            token.erase(0, token.find_first_not_of(" "));
+            token.erase(0, token.find_first_not_of(" \t"));
+            token.erase(token.find_last_not_of(" \t") + 1);
+
             if (token.substr(0, 7) == "Domain=")
             {
                 cookie.domain = token.substr(7);
@@ -274,7 +315,7 @@ namespace canaspad
             {
                 cookie.httpOnly = true;
             }
-            else if (token.substr(0, 7) == "Expires=")
+            else if (token.substr(0, 8) == "Expires=")
             {
                 // Expires 属性の処理
                 std::tm tm = {};
@@ -337,6 +378,19 @@ namespace canaspad
 
             parseHeader(line, result);
         }
+    }
+
+    bool Utils::caseInsensitiveCompare(const std::string &str1, const std::string &str2)
+    {
+        if (str1.length() != str2.length())
+        {
+            return false;
+        }
+        return std::equal(str1.begin(), str1.end(), str2.begin(),
+                          [](char a, char b)
+                          {
+                              return tolower(a) == tolower(b);
+                          });
     }
 
 } // namespace canaspad

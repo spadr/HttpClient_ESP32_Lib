@@ -1,0 +1,333 @@
+name: HttpClient ESP32 Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # Layer 1: Fast Unit Tests
+  unit-tests:
+    runs-on: ubuntu-latest
+    name: Layer 1 - Unit Tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+
+      - name: Setup Config Files
+        env:
+          E2E_TOKEN: ${{ secrets.E2E_TOKEN }}
+        run: |
+          mkdir -p src test
+
+          # 1. Setup src/Config.h and src/Config.cpp from ConfigExample
+          cp src/ConfigExample.h src/Config.h
+          cp src/Config.cpp src/Config.cpp.bak
+
+          # Replace ConfigExample namespace with Config
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.h
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.cpp
+          sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
+
+          # 2. Setup test/Config.h from ConfigExample
+          cp test/ConfigExample.h test/Config.h
+
+          # Inject E2E_TOKEN
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
+
+      - name: Run Unit Tests
+        shell: bash
+        run: |
+          set -o pipefail
+          chmod +x scripts/run-unit-tests.sh
+          mkdir -p .pio/test
+          ./scripts/run-unit-tests.sh --verbose 2>&1 | tee .pio/test/test_result.txt
+
+      - name: Upload Unit Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-results
+          path: .pio/test/
+
+  # Layer 2: Integration Tests with MockServer
+  integration-tests:
+    runs-on: ubuntu-latest
+    name: Layer 2 - Integration Tests
+
+    # services: MockServer service removed to allow run-integration-tests.sh to manage it via docker-compose
+    # This ensures consistency between local dev and CI environment
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev
+          pip install --upgrade platformio
+
+      - name: Setup Config Files
+        env:
+          E2E_TOKEN: ${{ secrets.E2E_TOKEN }}
+        run: |
+          mkdir -p src test
+
+          # 1. Setup src/Config.h and src/Config.cpp from ConfigExample
+          cp src/ConfigExample.h src/Config.h
+          cp src/Config.cpp src/Config.cpp.bak
+
+          # Replace ConfigExample namespace with Config
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.h
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.cpp
+          sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
+
+          # 2. Setup test/Config.h from ConfigExample
+          cp test/ConfigExample.h test/Config.h
+
+          # Inject E2E_TOKEN
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
+
+      - name: Wait for MockServer
+        # Removed: run-integration-tests.sh handles wait logic internally
+        run: echo "MockServer wait logic is handled by the script"
+
+      - name: Run Integration Tests
+        shell: bash
+        run: |
+          set -o pipefail
+          chmod +x scripts/run-integration-tests.sh
+          mkdir -p .pio/test
+          ./scripts/run-integration-tests.sh --verbose 2>&1 | tee .pio/test/test_result.txt
+
+      - name: Upload Integration Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: .pio/test/
+
+  # Layer 3: ESP32 Hardware Tests (optional, requires hardware)
+  hardware-tests:
+    runs-on: ubuntu-latest
+    name: Layer 3 - Hardware Tests (Build Only)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+
+      - name: Setup Config Files
+        env:
+          E2E_TOKEN: ${{ secrets.E2E_TOKEN }}
+        run: |
+          mkdir -p src test
+
+          # 1. Setup src/Config.h and src/Config.cpp from ConfigExample
+          cp src/ConfigExample.h src/Config.h
+          cp src/Config.cpp src/Config.cpp.bak
+
+          # Replace ConfigExample namespace with Config
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.h
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.cpp
+          sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
+
+          # 2. Setup test/Config.h from ConfigExample
+          cp test/ConfigExample.h test/Config.h
+
+          # Inject E2E_TOKEN
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
+
+      - name: Build ESP32 Tests
+        run: |
+          pio run -e m5stack-atom --verbose
+          pio run -e m5stack-atom-ex --verbose
+
+  # Code Coverage Analysis
+  coverage:
+    runs-on: ubuntu-latest
+    name: Code Coverage
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lcov
+          pip install --upgrade platformio
+
+      - name: Setup Config Files
+        env:
+          E2E_TOKEN: ${{ secrets.E2E_TOKEN }}
+        run: |
+          mkdir -p src test
+          cp src/ConfigExample.h src/Config.h
+          cp src/Config.cpp src/Config.cpp.bak
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.h
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.cpp
+          sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
+          cp test/ConfigExample.h test/Config.h
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
+
+      - name: Run Coverage Analysis
+        shell: bash
+        run: |
+          chmod +x scripts/run-coverage.sh
+          ./scripts/run-coverage.sh
+
+      - name: Report Coverage to Job Summary
+        run: |
+          echo "## 📊 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "coverage_report/coverage_filtered.info" ]; then
+            # Extract summary using lcov
+            lcov --summary coverage_report/coverage_filtered.info > coverage_summary.txt
+            
+            # Format for markdown
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            cat coverage_summary.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            
+            # Extract line coverage percentage for badging/highlighting
+            LINE_COV=$(grep "lines......:" coverage_summary.txt | cut -d: -f2 | cut -d% -f1 | xargs)
+            echo "Total Line Coverage: **${LINE_COV}%**" >> $GITHUB_STEP_SUMMARY
+            
+          else
+            echo "❌ Coverage report not found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Coverage HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-report
+          path: coverage_report/html/
+
+  # Test Report Generation
+  test-report:
+    runs-on: ubuntu-latest
+    name: Generate Test Report
+    needs: [unit-tests, integration-tests]
+    if: always()
+
+    steps:
+      - name: Download Unit Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-test-results
+          path: ./unit-results/
+        continue-on-error: true
+
+      - name: Download Integration Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: integration-test-results
+          path: ./integration-results/
+
+      - name: Generate Test Summary
+        run: |
+          # Define a function to output to both file and job summary
+          log_summary() {
+            echo "$1" >> test-summary.md
+            echo "$1" >> $GITHUB_STEP_SUMMARY
+          }
+
+          process_result() {
+            local dir="$1"
+            local title="$2"
+            local log_file="$dir/test_result.txt"
+            
+            log_summary "## $title"
+            
+            if [ ! -f "$log_file" ]; then
+              log_summary "❌ Report not found (Job might have failed before tests ran)"
+              return
+            fi
+            
+            # Clean ANSI codes for processing
+            local clean_log=$(sed 's/\x1b\[[0-9;]*m//g' "$log_file")
+            
+            # Check for Unity summary line (e.g. "================= 71 test cases: ...")
+            local summary_line=$(echo "$clean_log" | grep "test cases:" | tail -n 1)
+            
+            # Check failures
+            local failures=$(echo "$clean_log" | grep "\[FAILED\]")
+            
+            if [ -n "$failures" ]; then
+              log_summary "❌ **Tests Failed**"
+              if [ -n "$summary_line" ]; then
+                log_summary "**Summary:** $summary_line"
+              fi
+              log_summary ""
+              log_summary "<details><summary><strong>Failed Test Cases</strong></summary>"
+              log_summary ""
+              log_summary "\`\`\`text"
+              # Use echo and pipe to while loop to preserve newlines
+              echo "$failures" | while IFS= read -r line; do
+                log_summary "$line"
+              done
+              log_summary "\`\`\`"
+              log_summary "</details>"
+            else
+              if [ -n "$summary_line" ]; then
+                 log_summary "✅ **Tests Passed**"
+                 log_summary "**Summary:** $summary_line"
+              else
+                 log_summary "⚠️ **Tests Executed** (No summary line found - possible build error or crash)"
+                 log_summary "<details><summary>Last 10 lines of log</summary>"
+                 log_summary ""
+                 log_summary "\`\`\`text"
+                 tail -n 10 "$log_file" | while IFS= read -r line; do log_summary "$line"; done
+                 log_summary "\`\`\`"
+                 log_summary "</details>"
+              fi
+            fi
+            log_summary ""
+          }
+
+          echo "# Test Results Summary" > test-summary.md
+          echo "# Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          log_summary "Generated at: $(date)"
+          log_summary ""
+          
+          process_result "./unit-results" "Layer 1: Unit Tests"
+          process_result "./integration-results" "Layer 2: Integration Tests"
+
+      - name: Upload Test Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-summary
+          path: test-summary.md

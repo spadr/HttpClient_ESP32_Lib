@@ -94,23 +94,26 @@ namespace canaspad
 
     size_t WiFiSecureConnection::write(const uint8_t *buf, size_t size)
     {
-        setTimeout(m_writeTimeout.count() /
-                   1000); // WiFiSecureConnection::setTimeout() を呼び出す
+        // タイムアウトを秒単位で設定（切り上げ、最小1秒）
+        uint32_t timeoutSec = (m_writeTimeout.count() + 999) / 1000;
+        setTimeout(std::max(1u, timeoutSec));
         return WiFiClientSecure::write(buf, size);
     }
 
     int WiFiSecureConnection::read(uint8_t *buf, size_t size)
     {
-        setTimeout(m_readTimeout.count() /
-                   1000); // WiFiSecureConnection::setTimeout() を呼び出す
+        // タイムアウトを秒単位で設定（切り上げ、最小1秒）
+        uint32_t timeoutSec = (m_readTimeout.count() + 999) / 1000;
+        setTimeout(std::max(1u, timeoutSec));
         return WiFiClientSecure::read(buf, size);
     }
 
     // read(size_t size) 関数を追加
     std::string WiFiSecureConnection::read(size_t size)
     {
-        setTimeout(m_readTimeout.count() /
-                   1000); // WiFiSecureConnection::setTimeout() を呼び出す
+        // タイムアウトを秒単位で設定（切り上げ、最小1秒）
+        uint32_t timeoutSec = (m_readTimeout.count() + 999) / 1000;
+        setTimeout(std::max(1u, timeoutSec));
         std::string result;
         result.reserve(size);
         while (result.length() < size && available())
@@ -146,8 +149,9 @@ namespace canaspad
 
     std::string WiFiSecureConnection::readLine()
     {
-        setTimeout(m_readTimeout.count() /
-                   1000); // WiFiSecureConnection::setTimeout() を呼び出す
+        // タイムアウトを秒単位で設定（切り上げ、最小1秒）
+        uint32_t timeoutSec = (m_readTimeout.count() + 999) / 1000;
+        setTimeout(std::max(1u, timeoutSec));
         return readStringUntil('\n').c_str();
     }
 

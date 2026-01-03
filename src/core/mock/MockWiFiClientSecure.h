@@ -9,7 +9,11 @@
 #include <string>
 #include <chrono>
 #include <algorithm>
+#ifndef ARDUINO_ARCH_NATIVE
 #include <Arduino.h>
+#else
+#include "../../native_arduino_compat.h"
+#endif
 
 namespace canaspad
 {
@@ -110,5 +114,4 @@ namespace canaspad
         const std::string &getClientCert() const;
         const std::string &getClientPrivateKey() const;
     };
-
 } // namespace canaspad

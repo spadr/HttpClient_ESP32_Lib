@@ -292,5 +292,4 @@ namespace canaspad
     {
         return m_log;
     }
-
 } // namespace canaspad

@@ -1,12 +1,18 @@
 #pragma once
 
 #include "Connection.h"
+#ifndef ARDUINO_ARCH_NATIVE
 #include <WiFiClientSecure.h>
+#endif
 
 namespace canaspad
 {
 
+#ifndef ARDUINO_ARCH_NATIVE
     class WiFiSecureConnection : public Connection, public WiFiClientSecure
+#else
+    class WiFiSecureConnection : public Connection
+#endif
     {
     public:
         WiFiSecureConnection();
