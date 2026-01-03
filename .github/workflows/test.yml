@@ -163,8 +163,8 @@ jobs:
 
       - name: Build ESP32 Tests
         run: |
-          pio test -e m5stack-atom --without-testing --verbose
-          pio test -e m5stack-atom-ex --without-testing --verbose
+          pio run -e m5stack-atom --verbose
+          pio run -e m5stack-atom-ex --verbose
 
   # Test Report Generation
   test-report:
