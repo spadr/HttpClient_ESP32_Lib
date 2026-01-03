@@ -200,25 +200,66 @@ jobs:
             echo "$1" >> $GITHUB_STEP_SUMMARY
           }
 
+          process_result() {
+            local dir="$1"
+            local title="$2"
+            local log_file="$dir/test_result.txt"
+            
+            log_summary "## $title"
+            
+            if [ ! -f "$log_file" ]; then
+              log_summary "❌ Report not found (Job might have failed before tests ran)"
+              return
+            fi
+            
+            # Clean ANSI codes for processing
+            local clean_log=$(sed 's/\x1b\[[0-9;]*m//g' "$log_file")
+            
+            # Check for Unity summary line (e.g. "================= 71 test cases: ...")
+            local summary_line=$(echo "$clean_log" | grep "test cases:" | tail -n 1)
+            
+            # Check failures
+            local failures=$(echo "$clean_log" | grep "\[FAILED\]")
+            
+            if [ -n "$failures" ]; then
+              log_summary "❌ **Tests Failed**"
+              if [ -n "$summary_line" ]; then
+                log_summary "**Summary:** $summary_line"
+              fi
+              log_summary ""
+              log_summary "<details><summary><strong>Failed Test Cases</strong></summary>"
+              log_summary ""
+              log_summary "\`\`\`text"
+              # Use echo and pipe to while loop to preserve newlines
+              echo "$failures" | while IFS= read -r line; do
+                log_summary "$line"
+              done
+              log_summary "\`\`\`"
+              log_summary "</details>"
+            else
+              if [ -n "$summary_line" ]; then
+                 log_summary "✅ **Tests Passed**"
+                 log_summary "**Summary:** $summary_line"
+              else
+                 log_summary "⚠️ **Tests Executed** (No summary line found - possible build error or crash)"
+                 log_summary "<details><summary>Last 10 lines of log</summary>"
+                 log_summary ""
+                 log_summary "\`\`\`text"
+                 tail -n 10 "$log_file" | while IFS= read -r line; do log_summary "$line"; done
+                 log_summary "\`\`\`"
+                 log_summary "</details>"
+              fi
+            fi
+            log_summary ""
+          }
+
           echo "# Test Results Summary" > test-summary.md
           echo "# Test Results Summary" >> $GITHUB_STEP_SUMMARY
-          
-          log_summary ""
-          log_summary "## Layer 1: Unit Tests"
-          if [ -d "./unit-results" ]; then
-            log_summary "✅ Unit tests executed"
-          else
-            log_summary "❌ Unit tests failed"
-          fi
-          log_summary ""
-          log_summary "## Layer 2: Integration Tests"
-          if [ -d "./integration-results" ]; then
-            log_summary "✅ Integration tests executed"
-          else
-            log_summary "❌ Integration tests failed"
-          fi
-          log_summary ""
           log_summary "Generated at: $(date)"
+          log_summary ""
+          
+          process_result "./unit-results" "Layer 1: Unit Tests"
+          process_result "./integration-results" "Layer 2: Integration Tests"
 
       - name: Upload Test Summary
         uses: actions/upload-artifact@v4
