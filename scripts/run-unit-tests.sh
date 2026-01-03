@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -o pipefail
 
 # Colors
 RED='\033[0;31m'
@@ -53,8 +54,12 @@ if [[ "$CLEAN" == "yes" ]]; then
     rm -rf .pio/test/
 fi
 
+# Ensure output directory exists
+mkdir -p .pio/test
+
 # Run tests using the dedicated unit test environment
-$PIO_CMD test -e test_unit $VERBOSE
+# Save output to file while showing it on screen
+$PIO_CMD test -e test_unit $VERBOSE 2>&1 | tee .pio/test/test_result.txt
 
 if [[ $? -eq 0 ]]; then
     echo -e "${GREEN}✅ Unit tests passed${NC}"

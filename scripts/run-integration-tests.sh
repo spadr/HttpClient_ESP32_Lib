@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -o pipefail
 
 # Colors
 RED='\033[0;31m'
@@ -125,7 +126,12 @@ fi
 
 # Run tests using the dedicated integration test environment
 echo -e "${BLUE}Running tests...${NC}"
-$PIO_CMD test -e test_integration $VERBOSE
+
+# Ensure output directory exists
+mkdir -p .pio/test
+
+# Run tests and save output to file
+$PIO_CMD test -e test_integration $VERBOSE 2>&1 | tee .pio/test/test_result.txt
 
 if [[ $? -eq 0 ]]; then
     echo -e "${GREEN}✅ Integration tests passed${NC}"
