@@ -127,7 +127,6 @@ jobs:
   hardware-tests:
     runs-on: ubuntu-latest
     name: Layer 3 - Hardware Tests (Build Only)
-    if: github.event_name == 'pull_request'
 
     steps:
       - uses: actions/checkout@v4
