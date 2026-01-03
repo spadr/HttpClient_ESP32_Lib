@@ -48,7 +48,7 @@ jobs:
 
           # 2. Setup test/Config.h from ConfigExample
           cp test/ConfigExample.h test/Config.h
-          
+
           # Inject E2E_TOKEN
           sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
 
@@ -103,7 +103,7 @@ jobs:
 
           # 2. Setup test/Config.h from ConfigExample
           cp test/ConfigExample.h test/Config.h
-          
+
           # Inject E2E_TOKEN
           sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
 
@@ -157,7 +157,7 @@ jobs:
 
           # 2. Setup test/Config.h from ConfigExample
           cp test/ConfigExample.h test/Config.h
-          
+
           # Inject E2E_TOKEN
           sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
 

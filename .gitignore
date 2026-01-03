@@ -2,11 +2,13 @@
 .pio/
 .vscode/
 .vscode/ipch
-/src/Config.h
-/src/Config2.h
-/test/Config.h
+src/Config.h
+src/Config.cpp
+test/Config.h
+test/Config.cpp
 show_files.dart
 *.log
+.secrets
 
 # Test executables
 test_utils
@@ -46,3 +48,4 @@ memo
 /.claude/
 CLAUDE.md
 GEMINI.md
+
