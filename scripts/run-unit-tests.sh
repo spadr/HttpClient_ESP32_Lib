@@ -59,7 +59,7 @@ mkdir -p .pio/test
 
 # Run tests using the dedicated unit test environment
 # Save output to file while showing it on screen
-$PIO_CMD test -e test_unit $VERBOSE 2>&1 | tee .pio/test/test_result.txt
+$PIO_CMD test -e test_unit $VERBOSE 2>&1 | tee .pio/test/test_result_unit.txt
 
 if [[ $? -eq 0 ]]; then
     echo -e "${GREEN}✅ Unit tests passed${NC}"

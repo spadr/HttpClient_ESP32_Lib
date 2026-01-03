@@ -131,7 +131,7 @@ echo -e "${BLUE}Running tests...${NC}"
 mkdir -p .pio/test
 
 # Run tests and save output to file
-$PIO_CMD test -e test_integration $VERBOSE 2>&1 | tee .pio/test/test_result.txt
+$PIO_CMD test -e test_integration $VERBOSE 2>&1 | tee .pio/test/test_result_integration.txt
 
 if [[ $? -eq 0 ]]; then
     echo -e "${GREEN}✅ Integration tests passed${NC}"
