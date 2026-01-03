@@ -171,6 +171,71 @@ jobs:
           pio run -e m5stack-atom --verbose
           pio run -e m5stack-atom-ex --verbose
 
+  # Code Coverage Analysis
+  coverage:
+    runs-on: ubuntu-latest
+    name: Code Coverage
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lcov
+          pip install --upgrade platformio
+
+      - name: Setup Config Files
+        env:
+          E2E_TOKEN: ${{ secrets.E2E_TOKEN }}
+        run: |
+          mkdir -p src test
+          cp src/ConfigExample.h src/Config.h
+          cp src/Config.cpp src/Config.cpp.bak
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.h
+          sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.cpp
+          sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
+          cp test/ConfigExample.h test/Config.h
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
+
+      - name: Run Coverage Analysis
+        shell: bash
+        run: |
+          chmod +x scripts/run-coverage.sh
+          ./scripts/run-coverage.sh
+
+      - name: Report Coverage to Job Summary
+        run: |
+          echo "## 📊 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "coverage_report/coverage_filtered.info" ]; then
+            # Extract summary using lcov
+            lcov --summary coverage_report/coverage_filtered.info > coverage_summary.txt
+            
+            # Format for markdown
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            cat coverage_summary.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            
+            # Extract line coverage percentage for badging/highlighting
+            LINE_COV=$(grep "lines......:" coverage_summary.txt | cut -d: -f2 | cut -d% -f1 | xargs)
+            echo "Total Line Coverage: **${LINE_COV}%**" >> $GITHUB_STEP_SUMMARY
+            
+          else
+            echo "❌ Coverage report not found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Coverage HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-report
+          path: coverage_report/html/
+
   # Test Report Generation
   test-report:
     runs-on: ubuntu-latest
