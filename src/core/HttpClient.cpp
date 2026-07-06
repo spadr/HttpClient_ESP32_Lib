@@ -13,6 +13,7 @@
 #include "RequestValidator.h"
 #include "Logger.h"
 #include <iostream>
+#include <cctype>
 
 // Static constexpr member definitions (required for C++14/17 compatibility)
 constexpr size_t canaspad::HttpClient::DEFAULT_BUFFER_SIZE;
@@ -26,6 +27,39 @@ constexpr size_t canaspad::HttpClient::DEFAULT_REQUEST_BUFFER_RESERVE;
 
 namespace canaspad
 {
+
+    namespace
+    {
+        std::string findHeaderValue(const std::unordered_map<std::string, std::string> &headers, const std::string &key)
+        {
+            for (const auto &entry : headers)
+            {
+                if (Utils::caseInsensitiveCompare(entry.first, key))
+                {
+                    return entry.second;
+                }
+            }
+            return "";
+        }
+
+        bool isChunkedEncoding(const std::unordered_map<std::string, std::string> &headers)
+        {
+            const std::string transferEncoding = findHeaderValue(headers, "Transfer-Encoding");
+            std::string lower = transferEncoding;
+            std::transform(lower.begin(), lower.end(), lower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            return lower.find("chunked") != std::string::npos;
+        }
+
+        bool shouldConvertToGetOnRedirect(int statusCode, HttpMethod method)
+        {
+            if (method != HttpMethod::POST)
+            {
+                return false;
+            }
+            return statusCode == 301 || statusCode == 302 || statusCode == 303;
+        }
+    }
 
     // Static implementation of time synchronization
     bool HttpClient::syncTime(const std::string &timeUrl)
@@ -172,68 +206,205 @@ namespace canaspad
             return Result<HttpResult>(std::move(m_initializationError));
         }
 
+        m_cancelled = false;
         return sendWithRetries(request);
+    }
+
+    bool HttpClient::isCancelled() const
+    {
+        return m_cancelled.load();
+    }
+
+    Result<HttpResult> HttpClient::cancelledResult() const
+    {
+        return Result<HttpResult>(ErrorInfo(ErrorCode::RequestCancelled, "Request was cancelled"));
+    }
+
+    void HttpClient::notifyBodyChunk(const char *data, size_t size, size_t contentLength,
+                                     const ReadOptions &options, std::string &bodyAccumulator)
+    {
+        if (size == 0)
+        {
+            return;
+        }
+
+        if (options.streaming && options.chunkCallback)
+        {
+            options.chunkCallback(data, size);
+        }
+        else
+        {
+            if (m_responseBodyCallback)
+            {
+                m_responseBodyCallback(data, size);
+            }
+            bodyAccumulator.append(data, size);
+        }
+
+        if (m_progressCallback && contentLength > 0)
+        {
+            m_progressCallback(bodyAccumulator.size(), contentLength);
+        }
     }
 
     Result<HttpResult> HttpClient::sendWithRetries(const Request &request, int retryCount)
     {
+        return sendWithRetries(request, ReadOptions(), retryCount);
+    }
+
+    Result<HttpResult> HttpClient::sendWithRetries(const Request &request, ReadOptions options, int retryCount)
+    {
         LOG_DEBUG("HttpClient::sendWithRetries called. Retry count: %d", retryCount);
         LOG_DEBUG("Request URL: %s", request.getUrl().c_str());
-        auto result = sendWithRedirects(request);
+        auto result = sendWithRedirects(request, options, 0);
 
         if (result.isError())
         {
             const auto &error = result.error();
             LOG_ERROR("Error encountered: Code %d, Message: %s", static_cast<int>(error.code), error.message.c_str());
 
+            if (error.code == ErrorCode::RequestCancelled)
+            {
+                return result;
+            }
+
             // Timeout の場合もリトライ対象に含める
             if ((error.code == ErrorCode::NetworkError || error.code == ErrorCode::Timeout) &&
                 retryCount < m_options.maxRetries)
             {
                 LOG_INFO_S("Retrying request...");
-                // リトライ前に遅延を追加
                 std::this_thread::sleep_for(m_options.retryDelay);
-
-                return sendWithRetries(request, retryCount + 1);
+                return sendWithRetries(request, options, retryCount + 1);
             }
         }
         return result;
     }
 
-    Result<HttpResult> HttpClient::sendWithRedirects(const Request &request, int redirectCount)
+    void HttpClient::processCookies(const Request &request, HttpResult &httpResult)
     {
-        LOG_DEBUG("HttpClient::sendWithRedirects called. Redirect count: %d", redirectCount);
-        LOG_DEBUG("Current request URL: %s", request.getUrl().c_str());
-        auto modifiedRequest = request;
+        if (!m_cookiesEnabled)
+        {
+            return;
+        }
 
-        // 認証情報を適用
+        LOG_DEBUG_S("HttpClient::processCookies - Processing cookies");
+        for (const auto &setCookieHeader : Utils::extractHeaders(httpResult.headers, "Set-Cookie"))
+        {
+            Cookie cookie;
+            Utils::parseCookie(setCookieHeader, cookie, request.getUrl());
+            httpResult.cookies.push_back(cookie);
+            m_connectionPool->getCookieJar()->setCookie(request.getUrl(), setCookieHeader);
+        }
+    }
+
+    bool HttpClient::isSameOrigin(const std::string &url1, const std::string &url2) const
+    {
+        return Utils::extractScheme(url1) == Utils::extractScheme(url2) &&
+               Utils::extractHost(url1) == Utils::extractHost(url2) &&
+               Utils::extractPort(url1) == Utils::extractPort(url2);
+    }
+
+    Request HttpClient::buildRedirectRequest(const Request &originalRequest, const HttpResult &redirectResponse, int statusCode)
+    {
+        auto location = findHeaderValue(redirectResponse.headers, "Location");
+        if (location.find("://") == std::string::npos)
+        {
+            std::string baseUrl = Utils::extractBaseUrl(originalRequest.getUrl());
+            if (!location.empty() && location[0] != '/')
+            {
+                location = baseUrl + "/" + location;
+            }
+            else
+            {
+                location = baseUrl + location;
+            }
+        }
+
+        LOG_DEBUG("HttpClient::buildRedirectRequest - Redirecting to: %s", location.c_str());
+
+        Request redirectRequest;
+        redirectRequest.setUrl(location);
+
+        HttpMethod method = originalRequest.getMethod();
+        std::string body = originalRequest.getBody();
+        if (shouldConvertToGetOnRedirect(statusCode, method))
+        {
+            method = HttpMethod::GET;
+            body.clear();
+        }
+        redirectRequest.setMethod(method);
+        redirectRequest.setBody(body);
+
+        const bool sameOrigin = isSameOrigin(originalRequest.getUrl(), location);
+        for (const auto &header : originalRequest.getHeaders())
+        {
+            if (Utils::caseInsensitiveCompare(header.first, "Host"))
+            {
+                continue;
+            }
+            if (Utils::caseInsensitiveCompare(header.first, "Content-Length"))
+            {
+                continue;
+            }
+            if (!sameOrigin && Utils::caseInsensitiveCompare(header.first, "Authorization"))
+            {
+                continue;
+            }
+            if (method == HttpMethod::GET &&
+                (Utils::caseInsensitiveCompare(header.first, "Content-Type") ||
+                 Utils::caseInsensitiveCompare(header.first, "Content-Length")))
+            {
+                continue;
+            }
+
+            redirectRequest.addHeader(header.first, header.second);
+        }
+
+        return redirectRequest;
+    }
+
+    Result<HttpResult> HttpClient::executeRequest(const Request &request)
+    {
+        return executeRequest(request, ReadOptions());
+    }
+
+    Result<HttpResult> HttpClient::executeRequest(const Request &request, ReadOptions options)
+    {
+        if (isCancelled())
+        {
+            return cancelledResult();
+        }
+
+        auto modifiedRequest = request;
         m_auth->applyAuthentication(modifiedRequest);
 
-        // 接続の確立
         auto connectionResult = establishConnection(modifiedRequest);
         if (connectionResult.isError())
         {
-            LOG_ERROR_S("HttpClient::sendWithRedirects - Connection establishment failed");
+            LOG_ERROR_S("HttpClient::executeRequest - Connection establishment failed");
             return Result<HttpResult>(connectionResult.error());
         }
         auto connection = connectionResult.value();
 
-        // Connection null check
         if (!connection)
         {
-            LOG_ERROR_S("HttpClient::sendWithRedirects - Connection is null");
+            LOG_ERROR_S("HttpClient::executeRequest - Connection is null");
             return Result<HttpResult>(ErrorInfo(ErrorCode::NetworkError, "Connection is null"));
         }
 
-        std::string requestStr = buildRequestString(modifiedRequest);
-        LOG_DEBUG("HttpClient::sendWithRedirects - Request string built. Length: %zu", requestStr.length());
-
-        // 各種設定のバリデーション
         auto validationResult = RequestValidator::validate(modifiedRequest, m_options);
         if (validationResult.isError())
         {
-            LOG_ERROR_S("HttpClient::sendWithRedirects - Request validation failed");
+            LOG_ERROR_S("HttpClient::executeRequest - Request validation failed");
             return Result<HttpResult>(validationResult.error());
+        }
+
+        std::string requestStr = buildRequestString(modifiedRequest);
+        LOG_DEBUG("HttpClient::executeRequest - Request string built. Length: %zu", requestStr.length());
+
+        if (isCancelled())
+        {
+            return cancelledResult();
         }
 
         auto writeStart = std::chrono::steady_clock::now();
@@ -242,171 +413,83 @@ namespace canaspad
             auto writeDuration = std::chrono::steady_clock::now() - writeStart;
             if (writeDuration > m_timeouts.write)
             {
-                LOG_ERROR_S("HttpClient::sendWithRedirects - Write operation timed out");
+                LOG_ERROR_S("HttpClient::executeRequest - Write operation timed out");
                 return Result<HttpResult>(ErrorInfo(ErrorCode::Timeout, "Write operation timed out"));
             }
-            LOG_ERROR_S("HttpClient::sendWithRedirects - Failed to send request");
+            LOG_ERROR_S("HttpClient::executeRequest - Failed to send request");
             return Result<HttpResult>(ErrorInfo(ErrorCode::NetworkError, "Failed to send request"));
         }
-        LOG_DEBUG_S("HttpClient::sendWithRedirects - Request sent successfully");
+        LOG_DEBUG_S("HttpClient::executeRequest - Request sent successfully");
 
-        auto responseResult = readResponse(connection.get(), modifiedRequest);
-        LOG_DEBUG_S("HttpClient::sendWithRedirects - Response Result:");
-        if (responseResult.isSuccess())
-        {
-            const auto &httpResult = responseResult.value();
-            LOG_DEBUG("Status Code: %d", httpResult.statusCode);
-            LOG_DEBUG("Status Message: %s", httpResult.statusMessage.c_str());
-            LOG_DEBUG("Body length: %zu", httpResult.body.length());
-        }
-        else
-        {
-            LOG_ERROR("Error: %s", responseResult.error().message.c_str());
-        }
-
+        auto responseResult = readResponse(connection.get(), modifiedRequest, options);
         if (responseResult.isError())
         {
-            LOG_DEBUG_S("HttpClient::sendWithRedirects responseResult.isError() true");
             return responseResult;
         }
 
         auto httpResult = responseResult.value();
+        processCookies(modifiedRequest, httpResult);
+        return Result<HttpResult>(std::move(httpResult));
+    }
 
-        // クッキー処理
-        if (m_cookiesEnabled)
+    Result<HttpResult> HttpClient::sendWithRedirects(const Request &request)
+    {
+        return sendWithRedirects(request, ReadOptions(), 0);
+    }
+
+    Result<HttpResult> HttpClient::sendWithRedirects(const Request &request, ReadOptions options, int /*redirectCount*/)
+    {
+        LOG_DEBUG("HttpClient::sendWithRedirects called. Current request URL: %s", request.getUrl().c_str());
+
+        Request currentRequest = request;
+        for (int redirectCount = 0; redirectCount <= m_options.maxRedirects; ++redirectCount)
         {
-            LOG_DEBUG_S("HttpClient::sendWithRedirects - Processing cookies");
-            for (const auto &setCookieHeader : Utils::extractHeaders(httpResult.headers, "Set-Cookie"))
+            auto responseResult = executeRequest(currentRequest, options);
+            if (responseResult.isError())
             {
-                Cookie cookie;
-                Utils::parseCookie(setCookieHeader, cookie, modifiedRequest.getUrl());
-                httpResult.cookies.push_back(cookie);
-                m_connectionPool->getCookieJar()->setCookie(modifiedRequest.getUrl(), setCookieHeader);
+                return responseResult;
             }
-        }
 
-        // リダイレクト処理#1
-        // リダイレクト回数が最大を超えているかを確認
-        if (redirectCount >= m_options.maxRedirects)
-        {
-            LOG_ERROR_S("HttpClient::sendWithRedirects - Too many redirects");
-            return Result<HttpResult>(ErrorInfo(ErrorCode::TooManyRedirects, "Too many redirects"));
-        }
+            auto httpResult = responseResult.value();
+            LOG_DEBUG("HttpClient::sendWithRedirects - Received status code: %d", httpResult.statusCode);
 
-        LOG_DEBUG("HttpClient::sendWithRedirects - Received status code: %d", httpResult.statusCode);
-
-        // 200 OKのレスポンスを正常に処理
-        if (httpResult.statusCode >= 200 && httpResult.statusCode < 300)
-        {
-            LOG_DEBUG_S("HttpClient::sendWithRedirects - Successful response (200-299)");
-            return Result<HttpResult>(std::move(httpResult));
-        }
-
-        if (httpResult.statusCode >= 300 && httpResult.statusCode < 400)
-        {
-            if (m_options.followRedirects)
+            if (httpResult.statusCode >= 200 && httpResult.statusCode < 300)
             {
-                LOG_DEBUG_S("HttpClient::sendWithRedirects - Redirect detected (300-399)");
+                LOG_DEBUG_S("HttpClient::sendWithRedirects - Successful response (200-299)");
+                return Result<HttpResult>(std::move(httpResult));
+            }
 
-                auto location = Utils::extractHeaderValue(httpResult.headers, "Location");
-                if (!location.empty())
+            if (httpResult.statusCode >= 300 && httpResult.statusCode < 400)
+            {
+                if (!m_options.followRedirects)
                 {
-                    if (location.find("://") == std::string::npos)
-                    {
-                        std::string baseUrl = Utils::extractBaseUrl(request.getUrl());
-                        location = baseUrl + location;
-                    }
-
-                    LOG_DEBUG("HttpClient::sendWithRedirects - Redirecting to: %s", location.c_str());
-
-                    Request redirectRequest;
-                    redirectRequest.setUrl(location);
-                    redirectRequest.setMethod(request.getMethod());
-                    redirectRequest.setBody(request.getBody());
-
-                    // 元のリクエストのヘッダーを引き継ぐ
-                    // ただし、HostやContent-Lengthなどの特定のヘッダーは除外する必要がある場合があるが、
-                    // 現状のRequestクラスの仕様では上書きされるか、HttpClient::buildRequestStringで生成されるため
-                    // そのままコピーして問題ないもの（認証トークンなど）を優先する。
-                    for (const auto &header : request.getHeaders())
-                    {
-                        // HostヘッダーはURLから自動生成されるためコピーしない（buildRequestStringで処理）
-                        if (Utils::caseInsensitiveCompare(header.first, "Host"))
-                            continue;
-                        // Content-Lengthも自動計算されるためコピーしない
-                        if (Utils::caseInsensitiveCompare(header.first, "Content-Length"))
-                            continue;
-
-                        redirectRequest.addHeader(header.first, header.second);
-                    }
-
-                    // 新しい接続を確立
-                    auto redirectConnectionResult = establishConnection(redirectRequest);
-                    if (redirectConnectionResult.isError())
-                    {
-                        LOG_ERROR_S("HttpClient::sendWithRedirects - Failed to establish connection for redirect");
-                        return Result<HttpResult>(redirectConnectionResult.error());
-                    }
-                    auto redirectConnection = redirectConnectionResult.value();
-
-                    // 新しいリクエストを書き込む
-                    std::string redirectRequestStr = buildRequestString(redirectRequest);
-                    LOG_DEBUG("HttpClient::sendWithRedirects - Redirect request string built. Length: %zu", redirectRequestStr.length());
-                    LOG_DEBUG("HttpClient::sendWithRedirects - Redirect request: %s", redirectRequestStr.c_str());
-                    auto writeStart = std::chrono::steady_clock::now();
-                    if (redirectConnection->write(reinterpret_cast<const uint8_t *>(redirectRequestStr.c_str()), redirectRequestStr.length()) != redirectRequestStr.length())
-                    {
-                        auto writeDuration = std::chrono::steady_clock::now() - writeStart;
-                        if (writeDuration > m_timeouts.write)
-                        {
-                            LOG_ERROR_S("HttpClient::sendWithRedirects - Write operation timed out for redirect");
-                            return Result<HttpResult>(ErrorInfo(ErrorCode::Timeout, "Write operation timed out for redirect"));
-                        }
-                        LOG_ERROR_S("HttpClient::sendWithRedirects - Failed to send redirect request");
-                        return Result<HttpResult>(ErrorInfo(ErrorCode::NetworkError, "Failed to send redirect request"));
-                    }
-
-                    LOG_DEBUG_S("HttpClient::sendWithRedirects - Redirect request sent successfully");
-
-                    // リダイレクト先からのレスポンスを読み取る
-                    auto redirectResponseResult = readResponse(redirectConnection.get(), redirectRequest);
-                    if (redirectResponseResult.isError())
-                    {
-                        LOG_ERROR_S("HttpClient::sendWithRedirects - Failed to read redirect response");
-                        return redirectResponseResult;
-                    }
-
-                    // 成功レスポンス（200-299）の場合は、そのレスポンスを返す
-                    if (redirectResponseResult.value().statusCode >= 200 && redirectResponseResult.value().statusCode < 300)
-                    {
-                        LOG_DEBUG_S("HttpClient::sendWithRedirects - Successful response after redirect");
-                        return redirectResponseResult;
-                    }
-
-                    // リダイレクトの場合
-                    if (redirectResponseResult.value().statusCode >= 300 && redirectResponseResult.value().statusCode < 400)
-                    {
-                        LOG_DEBUG_S("HttpClient::sendWithRedirects - Redirect after redirect");
-                        // TODO redirectResponseResultの情報を使って再帰的に処理したい、しかしながら関数がうまく分割されていないのでリダイレクト処理#1に戻ることが出来ない。
-                    }
-
-                    // それ以外の場合は再帰的に処理
-                    return sendWithRedirects(redirectRequest, redirectCount + 1);
+                    LOG_DEBUG_S("HttpClient::sendWithRedirects - Redirect function is disabled");
+                    return Result<HttpResult>(std::move(httpResult));
                 }
-                else
+
+                if (redirectCount >= m_options.maxRedirects)
+                {
+                    LOG_ERROR_S("HttpClient::sendWithRedirects - Too many redirects");
+                    return Result<HttpResult>(ErrorInfo(ErrorCode::TooManyRedirects, "Too many redirects"));
+                }
+
+                auto location = findHeaderValue(httpResult.headers, "Location");
+                if (location.empty())
                 {
                     LOG_ERROR_S("HttpClient::sendWithRedirects - Redirect location not found");
                     return Result<HttpResult>(ErrorInfo(ErrorCode::InvalidResponse, "Redirect location not found"));
                 }
+
+                currentRequest = buildRedirectRequest(currentRequest, httpResult, httpResult.statusCode);
+                continue;
             }
-            else
-            {
-                LOG_DEBUG_S("HttpClient::sendWithRedirects - Redirect function is disabled");
-            }
+
+            LOG_DEBUG("HttpClient::sendWithRedirects - Unhandled status code: %d", httpResult.statusCode);
+            return Result<HttpResult>(std::move(httpResult));
         }
 
-        LOG_DEBUG("HttpClient::sendWithRedirects - Unhandled status code: %d", httpResult.statusCode);
-        return Result<HttpResult>(std::move(httpResult));
+        LOG_ERROR_S("HttpClient::sendWithRedirects - Too many redirects");
+        return Result<HttpResult>(ErrorInfo(ErrorCode::TooManyRedirects, "Too many redirects"));
     }
 
     Result<std::shared_ptr<Connection>> HttpClient::establishConnection(const Request &request)
@@ -517,6 +600,11 @@ namespace canaspad
 
     Result<HttpResult> HttpClient::readResponse(Connection *connection, const Request &request)
     {
+        return readResponse(connection, request, ReadOptions());
+    }
+
+    Result<HttpResult> HttpClient::readResponse(Connection *connection, const Request &request, ReadOptions options)
+    {
         if (!connection)
         {
             return Result<HttpResult>(ErrorInfo(ErrorCode::InvalidResponse, "Connection is null"));
@@ -527,17 +615,23 @@ namespace canaspad
 
         try
         {
-            // Use heap allocation instead of stack to avoid stack overflow
             const size_t bufferSize = HttpClient::DEFAULT_BUFFER_SIZE;
             std::unique_ptr<uint8_t[]> buffer(new uint8_t[bufferSize]);
             size_t totalBytesRead = 0;
             std::string responseStr;
+            std::string bodyAccumulator;
             bool headersCompleted = false;
             size_t contentLength = 0;
+            bool chunked = false;
+            bool useConnectionClose = false;
 
             while (connection->connected())
             {
-                // タイムアウトチェックを追加
+                if (isCancelled())
+                {
+                    return cancelledResult();
+                }
+
                 auto elapsed = std::chrono::steady_clock::now() - readStart;
                 if (elapsed >= m_timeouts.read)
                 {
@@ -547,9 +641,10 @@ namespace canaspad
                     return Result<HttpResult>(ErrorInfo(ErrorCode::Timeout, "Read operation timed out while reading response"));
                 }
 
-                if (m_useMock && headersCompleted && responseStr.length() >= contentLength)
+                if (m_useMock && headersCompleted && !chunked && !useConnectionClose &&
+                    (bodyAccumulator.size() + responseStr.size()) >= contentLength)
                 {
-                    break; // モックオブジェクトを使用している場合、ここでループを抜ける
+                    break;
                 }
 
                 size_t bytesAvailable = connection->available();
@@ -583,59 +678,105 @@ namespace canaspad
                                 Utils::parseStatusLine(headers, httpResult);
                                 Utils::parseHeaders(headers, httpResult);
                                 contentLength = Utils::extractContentLength(httpResult.headers);
+                                chunked = isChunkedEncoding(httpResult.headers);
+                                const bool hasContentLengthHeader =
+                                    !findHeaderValue(httpResult.headers, "Content-Length").empty();
+                                useConnectionClose = !chunked && !hasContentLengthHeader;
                                 responseStr = responseStr.substr(headerEnd + 4);
+
+                                if (!chunked && hasContentLengthHeader && contentLength == 0)
+                                {
+                                    LOG_DEBUG_S("HttpClient::readResponse - Zero content-length response received");
+                                    if (m_useMock)
+                                    {
+                                        auto mockConnection = static_cast<MockWiFiClientSecure *>(connection);
+                                        mockConnection->moveToNextResponse();
+                                    }
+                                    break;
+                                }
+
+                                if (chunked)
+                                {
+                                    httpResult.body = responseStr;
+                                    return handleChunkedResponse(connection, httpResult, 0, options);
+                                }
                             }
                         }
 
-                        // レスポンスの終わりを検出する処理を追加
-                        if (headersCompleted && responseStr.length() >= contentLength)
+                        if (headersCompleted && !chunked)
                         {
-                            LOG_DEBUG_S("HttpClient::readResponse - Complete response received");
-                            if (m_useMock)
+                            const size_t pendingBodySize = bodyAccumulator.size() + responseStr.size();
+
+                            if (useConnectionClose)
                             {
-                                auto mockConnection = static_cast<MockWiFiClientSecure *>(connection);
-                                mockConnection->moveToNextResponse();
+                                if (!responseStr.empty())
+                                {
+                                    notifyBodyChunk(responseStr.c_str(), responseStr.size(), 0, options, bodyAccumulator);
+                                    responseStr.clear();
+                                }
                             }
-                            break;
+                            else if (pendingBodySize >= contentLength)
+                            {
+                                if (!responseStr.empty())
+                                {
+                                    notifyBodyChunk(responseStr.c_str(), responseStr.size(), contentLength, options, bodyAccumulator);
+                                    responseStr.clear();
+                                }
+
+                                LOG_DEBUG_S("HttpClient::readResponse - Complete response received");
+                                if (m_useMock)
+                                {
+                                    auto mockConnection = static_cast<MockWiFiClientSecure *>(connection);
+                                    mockConnection->moveToNextResponse();
+                                }
+                                break;
+                            }
+                            else if (!options.streaming && !responseStr.empty())
+                            {
+                                notifyBodyChunk(responseStr.c_str(), responseStr.size(), contentLength, options, bodyAccumulator);
+                                responseStr.clear();
+                            }
                         }
                     }
                 }
+                else if (headersCompleted && useConnectionClose && !connection->connected())
+                {
+                    break;
+                }
                 else
                 {
+                    if (headersCompleted && useConnectionClose && bytesAvailable == 0 && !connection->connected())
+                    {
+                        break;
+                    }
                     std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 }
             }
 
-            // loopから抜けたことをプリント
             LOG_DEBUG_S("HttpClient::readResponse - Loop exited");
+
+            if (isCancelled())
+            {
+                return cancelledResult();
+            }
+
             LOG_DEBUG("HttpClient::readResponse - Parsed status line: %d %s", httpResult.statusCode, httpResult.statusMessage.c_str());
 
-            httpResult.body = std::move(responseStr);
-
-            // デバッグ出力（既存のコード）
-            LOG_DEBUG_S("HttpClient::readResponse - Parsed HttpResult:");
-            LOG_DEBUG("Status Code: %d", httpResult.statusCode);
-            LOG_DEBUG("Status Message: %s", httpResult.statusMessage.c_str());
-            LOG_DEBUG_S("Headers:");
-            for (const auto &header : httpResult.headers)
+            if (options.streaming)
             {
-                LOG_DEBUG("%s: %s", header.first.c_str(), header.second.c_str());
-            }
-            LOG_DEBUG("Body length: %zu", httpResult.body.length());
-
-            auto result = Result<HttpResult>(std::move(httpResult));
-
-            LOG_DEBUG_S("HttpClient::readResponse - Result<HttpResult>:");
-            if (result.isSuccess())
-            {
-                LOG_DEBUG_S("Result is success");
+                httpResult.body.clear();
             }
             else
             {
-                LOG_ERROR("Result is error: %s", result.error().message.c_str());
+                httpResult.body = std::move(bodyAccumulator);
+                if (!responseStr.empty())
+                {
+                    httpResult.body.append(responseStr);
+                }
             }
 
-            return result;
+            LOG_DEBUG("HttpClient::readResponse - Body length: %zu", httpResult.body.length());
+            return Result<HttpResult>(std::move(httpResult));
         }
         catch (const std::exception &e)
         {
@@ -646,29 +787,48 @@ namespace canaspad
 
     Result<HttpResult> HttpClient::handleChunkedResponse(Connection *connection, HttpResult &result, size_t startingPos)
     {
+        return handleChunkedResponse(connection, result, startingPos, ReadOptions());
+    }
+
+    Result<HttpResult> HttpClient::handleChunkedResponse(Connection *connection, HttpResult &result, size_t startingPos, ReadOptions options)
+    {
         auto readStart = std::chrono::steady_clock::now();
-        const size_t bufferSize = 4096;
+        const size_t bufferSize = HttpClient::DEFAULT_BUFFER_SIZE;
         std::unique_ptr<uint8_t[]> buffer(new uint8_t[bufferSize]);
         size_t totalRead = 0;
 
-        // startingPos から読み込みを開始
-        std::string chunkedData = result.body; // 既存のデータ
+        std::string chunkedData = result.body;
+        result.body.clear();
         size_t currentPos = startingPos;
+        std::string bodyAccumulator;
+
+        auto readMoreChunkedData = [&]()
+        {
+            size_t bytesAvailable = connection->available();
+            if (bytesAvailable == 0)
+            {
+                return 0;
+            }
+            size_t bytesToRead = std::min(bytesAvailable, bufferSize);
+            return connection->read(buffer.get(), bytesToRead);
+        };
 
         while (true)
         {
+            if (isCancelled())
+            {
+                return cancelledResult();
+            }
+
             if (std::chrono::steady_clock::now() - readStart > m_timeouts.read)
             {
                 return Result<HttpResult>(ErrorInfo(ErrorCode::Timeout, "Read operation timed out while reading chunked response"));
             }
 
-            // チャンクサイズ行を見つける
             size_t chunkSizeLineEnd = chunkedData.find("\r\n", currentPos);
             if (chunkSizeLineEnd == std::string::npos)
             {
-                // データが足りない場合は、さらに読み込む
-                size_t bytesToRead = std::min(bufferSize, chunkedData.capacity() - chunkedData.size());
-                int bytesRead = connection->read(buffer.get(), bytesToRead);
+                int bytesRead = readMoreChunkedData();
                 if (bytesRead > 0)
                 {
                     chunkedData.append(reinterpret_cast<char *>(buffer.get()), bytesRead);
@@ -679,33 +839,50 @@ namespace canaspad
                     return Result<HttpResult>(ErrorInfo(ErrorCode::NetworkError, "Connection closed unexpectedly"));
                 }
             }
-            std::string chunkSizeLine = chunkedData.substr(currentPos, chunkSizeLineEnd - currentPos);
-            currentPos = chunkSizeLineEnd + 2; // 次のチャンクの開始位置に更新
 
-            char *endptr;
+            std::string chunkSizeLine = chunkedData.substr(currentPos, chunkSizeLineEnd - currentPos);
+            auto semicolonPos = chunkSizeLine.find(';');
+            if (semicolonPos != std::string::npos)
+            {
+                chunkSizeLine = chunkSizeLine.substr(0, semicolonPos);
+            }
+            currentPos = chunkSizeLineEnd + 2;
+
+            char *endptr = nullptr;
             size_t chunkSize = std::strtoul(chunkSizeLine.c_str(), &endptr, 16);
-            if (*endptr != '\0' || chunkSizeLine.empty())
+            if (endptr == chunkSizeLine.c_str() || chunkSizeLine.empty())
             {
                 return Result<HttpResult>(ErrorInfo(ErrorCode::InvalidResponse, "Invalid chunk size: " + chunkSizeLine));
             }
 
             if (chunkSize == 0)
             {
-                // チャンクの終わり
+                if (currentPos + 2 <= chunkedData.size() && chunkedData.compare(currentPos, 2, "\r\n") == 0)
+                {
+                    currentPos += 2;
+                }
+                else
+                {
+                    std::string trailerLine;
+                    while (true)
+                    {
+                        trailerLine = connection->readLine();
+                        if (trailerLine.empty() || trailerLine == "\r\n")
+                        {
+                            break;
+                        }
+                        Utils::parseHeader(trailerLine, result);
+                    }
+                }
                 break;
             }
 
-            // チャンクデータを見つける
-            size_t chunkDataEnd = chunkedData.find("\r\n", currentPos);
-            while (chunkDataEnd == std::string::npos)
+            while (currentPos + chunkSize + 2 > chunkedData.size())
             {
-                // データが足りない場合は、さらに読み込む
-                size_t bytesToRead = std::min(bufferSize, chunkedData.capacity() - chunkedData.size());
-                int bytesRead = connection->read(buffer.get(), bytesToRead);
+                int bytesRead = readMoreChunkedData();
                 if (bytesRead > 0)
                 {
                     chunkedData.append(reinterpret_cast<char *>(buffer.get()), bytesRead);
-                    chunkDataEnd = chunkedData.find("\r\n", currentPos);
                 }
                 else
                 {
@@ -713,22 +890,25 @@ namespace canaspad
                 }
             }
 
-            // チャンクデータを追加
-            // 既存のbodyに直接追加することで、一時変数のコピーを回避
-            result.body.append(chunkedData, currentPos, chunkSize);
+            const char *chunkData = chunkedData.data() + currentPos;
+            notifyBodyChunk(chunkData, chunkSize, 0, options, bodyAccumulator);
             totalRead += chunkSize;
-            currentPos = chunkDataEnd + 2; // 次のチャンクの開始位置に更新
+            currentPos += chunkSize + 2;
         }
 
-        // トレーラーヘッダーを読み込む
-        std::string trailerLine;
-        while ((trailerLine = connection->readLine()) != "\r\n")
+        if (options.streaming)
         {
-            if (std::chrono::steady_clock::now() - readStart > m_timeouts.read)
-            {
-                return Result<HttpResult>(ErrorInfo(ErrorCode::Timeout, "Read operation timed out while reading trailer headers"));
-            }
-            Utils::parseHeader(trailerLine, result);
+            result.body.clear();
+        }
+        else
+        {
+            result.body = std::move(bodyAccumulator);
+        }
+
+        if (m_useMock)
+        {
+            auto mockConnection = static_cast<MockWiFiClientSecure *>(connection);
+            mockConnection->moveToNextResponse();
         }
 
         return Result<HttpResult>(std::move(result));
@@ -754,11 +934,17 @@ namespace canaspad
         m_timeouts.write = timeout;
     }
 
-    void HttpClient::cancel(const std::string &requestId)
+    void HttpClient::cancel(const std::string & /*requestId*/)
     {
-        // 実装は基盤となるネットワーク層に依存します
-        // 現在は、単に切断します
-        m_connectionPool->disconnectAll();
+        m_cancelled = true;
+        if (m_connectionPool)
+        {
+            m_connectionPool->disconnectAll();
+        }
+        if (m_mockConnection)
+        {
+            m_mockConnection->disconnect();
+        }
     }
 
     void HttpClient::enableCookies(bool enable)
@@ -778,8 +964,21 @@ namespace canaspad
 
     Result<HttpResult> HttpClient::sendStreaming(const Request &request, ChunkCallback chunkCallback)
     {
-        // ストリーミング送信は未実装
-        return Result<HttpResult>(ErrorInfo(ErrorCode::UnsupportedOperation, "Streaming is not yet supported."));
+        if (!chunkCallback)
+        {
+            return Result<HttpResult>(ErrorInfo(ErrorCode::InvalidOption, "Chunk callback is required for streaming"));
+        }
+
+        if (!m_isInitialized)
+        {
+            return Result<HttpResult>(std::move(m_initializationError));
+        }
+
+        m_cancelled = false;
+        ReadOptions options;
+        options.streaming = true;
+        options.chunkCallback = std::move(chunkCallback);
+        return sendWithRetries(request, options, 0);
     }
 
     std::string HttpClient::buildRequestString(const Request &request)

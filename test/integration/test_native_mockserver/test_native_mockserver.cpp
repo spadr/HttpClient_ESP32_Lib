@@ -154,6 +154,47 @@ void test_large_response()
     TEST_ASSERT_EQUAL(2048, result.value().body.length());
 }
 
+void test_multi_redirect_chain()
+{
+    mockServer->setupMockRedirect("/redirect1", getBaseUrl() + "/redirect2");
+    mockServer->setupMockRedirect("/redirect2", getBaseUrl() + "/target");
+    mockServer->setupMock("/target", "GET", "Chain Complete", 200);
+
+    canaspad::ClientOptions options;
+    options.followRedirects = true;
+    delete client;
+    client = new canaspad::HttpClient(options);
+
+    canaspad::Request request;
+    request.setUrl(getBaseUrl() + "/redirect1");
+    request.setMethod(canaspad::HttpMethod::GET);
+
+    auto result = client->send(request);
+
+    if (result.isError())
+        printf("Request failed: %s\n", result.error().message.c_str());
+    TEST_ASSERT_TRUE(result.isSuccess());
+    TEST_ASSERT_EQUAL(200, result.value().statusCode);
+    TEST_ASSERT_EQUAL_STRING("Chain Complete", result.value().body.c_str());
+}
+
+void test_chunked_response()
+{
+    mockServer->setupMockChunked("/chunked", "GET", "Chunked Response Body", 200);
+
+    canaspad::Request request;
+    request.setUrl(getBaseUrl() + "/chunked");
+    request.setMethod(canaspad::HttpMethod::GET);
+
+    auto result = client->send(request);
+
+    if (result.isError())
+        printf("Request failed: %s\n", result.error().message.c_str());
+    TEST_ASSERT_TRUE(result.isSuccess());
+    TEST_ASSERT_EQUAL(200, result.value().statusCode);
+    TEST_ASSERT_EQUAL_STRING("Chunked Response Body", result.value().body.c_str());
+}
+
 int main(int argc, char **argv)
 {
     UNITY_BEGIN();
@@ -162,6 +203,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_404_not_found);
     RUN_TEST(test_timeout_handling);
     RUN_TEST(test_redirect_handling);
+    RUN_TEST(test_multi_redirect_chain);
+    RUN_TEST(test_chunked_response);
     RUN_TEST(test_large_response);
     UNITY_END();
     return 0;

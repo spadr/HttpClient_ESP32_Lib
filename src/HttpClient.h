@@ -69,17 +69,39 @@ namespace canaspad
 
         bool m_isInitialized = true;
         ErrorInfo m_initializationError;
+        std::atomic<bool> m_cancelled{false};
+
+        struct ReadOptions
+        {
+            bool streaming;
+            ChunkCallback chunkCallback;
+
+            ReadOptions() : streaming(false), chunkCallback(nullptr) {}
+        };
 
         bool checkTimeout(const std::chrono::steady_clock::time_point &start,
                           const std::chrono::milliseconds &timeout) const;
-        Result<HttpResult> sendWithRedirects(const Request &request, int redirectCount = 0);
+        bool isCancelled() const;
+        Result<HttpResult> cancelledResult() const;
+        void notifyBodyChunk(const char *data, size_t size, size_t contentLength,
+                             const ReadOptions &options, std::string &bodyAccumulator);
+        Result<HttpResult> executeRequest(const Request &request);
+        Result<HttpResult> executeRequest(const Request &request, ReadOptions options);
+        Request buildRedirectRequest(const Request &originalRequest, const HttpResult &redirectResponse, int statusCode);
+        bool isSameOrigin(const std::string &url1, const std::string &url2) const;
+        void processCookies(const Request &request, HttpResult &httpResult);
+        Result<HttpResult> sendWithRedirects(const Request &request);
+        Result<HttpResult> sendWithRedirects(const Request &request, ReadOptions options, int redirectCount);
         Result<HttpResult> sendWithRetries(const Request &request, int retryCount = 0);
+        Result<HttpResult> sendWithRetries(const Request &request, ReadOptions options, int retryCount);
         Result<std::shared_ptr<Connection>> establishConnection(const Request &request);
         Result<std::shared_ptr<Connection>> establishDirectConnection(std::shared_ptr<Connection> connection, const std::string &host, int port);
         Result<std::shared_ptr<Connection>> establishProxyConnection(std::shared_ptr<Connection> connection, const Request &request);
         Result<std::shared_ptr<Connection>> establishProxyTunnel(std::shared_ptr<Connection> connection, const Request &request, const std::string &proxyHost, int proxyPort);
         Result<HttpResult> readResponse(Connection *connection, const Request &request);
+        Result<HttpResult> readResponse(Connection *connection, const Request &request, ReadOptions options);
         Result<HttpResult> handleChunkedResponse(Connection *connection, HttpResult &result, size_t startingPos);
+        Result<HttpResult> handleChunkedResponse(Connection *connection, HttpResult &result, size_t startingPos, ReadOptions options);
 
         std::string buildRequestString(const Request &request);
     };
