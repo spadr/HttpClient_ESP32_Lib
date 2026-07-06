@@ -49,7 +49,8 @@ jobs:
           # 2. Setup test/Config.h from ConfigExample
           cp test/ConfigExample.h test/Config.h
 
-          # Inject E2E_TOKEN
+          # Inject E2E_TOKEN (E2E tests use src/Config.h; unit validation uses test/Config.h)
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" src/Config.cpp
           sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
 
       - name: Run Unit Tests
@@ -107,7 +108,8 @@ jobs:
           # 2. Setup test/Config.h from ConfigExample
           cp test/ConfigExample.h test/Config.h
 
-          # Inject E2E_TOKEN
+          # Inject E2E_TOKEN (E2E tests use src/Config.h; unit validation uses test/Config.h)
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" src/Config.cpp
           sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
 
       - name: Wait for MockServer
@@ -163,13 +165,14 @@ jobs:
           # 2. Setup test/Config.h from ConfigExample
           cp test/ConfigExample.h test/Config.h
 
-          # Inject E2E_TOKEN
+          # Inject E2E_TOKEN (E2E tests use src/Config.h; unit validation uses test/Config.h)
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" src/Config.cpp
           sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
 
       - name: Build ESP32 Tests
         run: |
-          pio run -e m5stack-atom --verbose
-          pio run -e m5stack-atom-ex --verbose
+          pio test -e test_e2e --without-uploading --without-testing
+          pio run -d examples/BasicRequest -e m5stack-atom --verbose
 
   # Code Coverage Analysis
   coverage:
@@ -201,6 +204,7 @@ jobs:
           sed -i 's/namespace ConfigExample/namespace Config/g' src/Config.cpp
           sed -i 's/"ConfigExample.h"/"Config.h"/g' src/Config.cpp
           cp test/ConfigExample.h test/Config.h
+          sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" src/Config.cpp
           sed -i "s/dummy_e2e_token/${E2E_TOKEN:-dummy_token}/g" test/Config.h
 
       - name: Run Coverage Analysis

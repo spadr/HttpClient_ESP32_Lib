@@ -31,7 +31,28 @@ namespace canaspad
 
     Request &Request::setMultipartFormData(const std::vector<std::pair<std::string, std::string>> &formData)
     {
-        m_multipartFormData = formData;
+        m_multipartParts.clear();
+        for (const auto &field : formData)
+        {
+            MultipartPart part;
+            part.name = field.first;
+            part.content = field.second;
+            m_multipartParts.push_back(std::move(part));
+        }
+        return *this;
+    }
+
+    Request &Request::addMultipartFile(const std::string &name,
+                                       const std::string &filename,
+                                       const std::string &content,
+                                       const std::string &contentType)
+    {
+        MultipartPart part;
+        part.name = name;
+        part.filename = filename;
+        part.content = content;
+        part.contentType = contentType;
+        m_multipartParts.push_back(std::move(part));
         return *this;
     }
 
@@ -57,7 +78,17 @@ namespace canaspad
 
     const std::vector<std::pair<std::string, std::string>> &Request::getMultipartFormData() const
     {
-        return m_multipartFormData;
+        m_multipartLegacyView.clear();
+        for (const auto &part : m_multipartParts)
+        {
+            m_multipartLegacyView.emplace_back(part.name, part.content);
+        }
+        return m_multipartLegacyView;
+    }
+
+    const std::vector<MultipartPart> &Request::getMultipartParts() const
+    {
+        return m_multipartParts;
     }
 
 } // namespace canaspad

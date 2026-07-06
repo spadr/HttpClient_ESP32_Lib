@@ -45,15 +45,29 @@ public:
     }
 
     // リダイレクト用モック作成
-    void setupMockRedirect(const std::string &path, const std::string &location)
+    void setupMockRedirect(const std::string &path, const std::string &location, int statusCode = 302)
     {
         std::string json = "{"
                            "\"httpRequest\": { \"method\": \"GET\", \"path\": \"" +
                            path + "\" },"
-                                  "\"httpResponse\": { \"statusCode\": 302,"
+                                  "\"httpResponse\": { \"statusCode\": " + std::to_string(statusCode) + ","
                                   "\"headers\": { \"Location\": [\"" +
                            location + "\"] } }"
                                       "}";
+        sendExpectation(json);
+    }
+
+    // chunked レスポンス用モック作成
+    void setupMockChunked(const std::string &path, const std::string &method, const std::string &responseBody, int statusCode = 200)
+    {
+        std::string json = "{"
+                           "\"httpRequest\": { \"method\": \"" +
+                           method + "\", \"path\": \"" + path + "\" },"
+                                    "\"httpResponse\": { \"statusCode\": " + std::to_string(statusCode) + ","
+                                    "\"headers\": { \"Transfer-Encoding\": [\"chunked\"] },"
+                                    "\"body\": \"" +
+                           escapeJson(responseBody) + "\" }"
+                                                      "}";
         sendExpectation(json);
     }
 

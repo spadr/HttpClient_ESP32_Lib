@@ -57,6 +57,10 @@ fi
 # Ensure output directory exists
 mkdir -p .pio/test
 
+# Install deps and strip cpp-httplib extras before the first compile
+$PIO_CMD pkg install -e test_unit
+python3 scripts/fix_cpp_httplib.py test_unit
+
 # Run tests using the dedicated unit test environment
 # Save output to file while showing it on screen
 $PIO_CMD test -e test_unit $VERBOSE 2>&1 | tee .pio/test/test_result_unit.txt

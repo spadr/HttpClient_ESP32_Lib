@@ -269,6 +269,17 @@ namespace canaspad
             return 0;
         }
 
+        if (m_readBehavior == ReadBehavior::SlowResponse)
+        {
+            std::this_thread::sleep_for(m_slowResponseDelay);
+        }
+
+        if (m_readBehavior == ReadBehavior::DropConnection)
+        {
+            m_connected = false;
+            return 0;
+        }
+
         const auto currentResponse = m_responses.front();
         size_t bytesAvailable = currentResponse.size() - m_currentResponsePos;
         size_t bytesToRead = std::min(size, bytesAvailable);

@@ -1,11 +1,14 @@
-#include "ConfigExample.h"
+#include "Config.h"
 
-namespace ConfigExample
+namespace Config
 {
     const char *ssid = "WiFi_SSID";
     const char *password = "WiFi_PASSWORD";
     const long gmt_offset_sec = 3600 * 9;
     const int daylight_offset_sec = 0;
+
+    // E2EチE��ト用認証ト�Eクン (CIでは置換されまぁE
+    const char *e2e_token = "dummy_e2e_token";
 
     // Google Trust Services Root R4
     const char *gts_root_r4 = "-----BEGIN CERTIFICATE-----\n"
@@ -22,4 +25,4 @@ namespace ConfigExample
                               "p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD\n"
                               "-----END CERTIFICATE-----\n";
 
-} // namespace ConfigExample
+} // namespace Config

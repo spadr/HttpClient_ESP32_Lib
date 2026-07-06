@@ -46,6 +46,8 @@ rm -rf $COVERAGE_DIR
 
 # Run tests
 echo "Running unit tests..."
+$PIO_CMD pkg install -e test_coverage
+python3 scripts/fix_cpp_httplib.py test_coverage
 $PIO_CMD test -e test_coverage
 
 # Generate coverage
