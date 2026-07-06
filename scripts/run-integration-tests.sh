@@ -130,6 +130,10 @@ echo -e "${BLUE}Running tests...${NC}"
 # Ensure output directory exists
 mkdir -p .pio/test
 
+# Install deps and strip cpp-httplib extras before the first compile
+$PIO_CMD pkg install -e test_integration
+python3 scripts/fix_cpp_httplib.py test_integration
+
 # Run tests and save output to file
 $PIO_CMD test -e test_integration $VERBOSE 2>&1 | tee .pio/test/test_result_integration.txt
 
