@@ -1,7 +1,7 @@
 import os
 import shutil
 import sys
-from os.path import abspath, dirname, exists, isdir, join
+from os.path import abspath, dirname, exists, isdir, isfile, join
 
 KEEP_FILES = {"httplib.h", "LICENSE", "README.md", "library.json", ".piopm"}
 
@@ -40,7 +40,7 @@ def find_cpp_httplib_dirs(libdeps_dir):
     ]
 
 
-def cleanup_for_env(project_dir, pioenv):
+def prepare_cpp_httplib(project_dir, pioenv):
     libdeps_dir = join(project_dir, ".pio", "libdeps", pioenv)
     print(f"Checking cpp-httplib cleanup in {libdeps_dir}...")
 
@@ -55,23 +55,62 @@ def cleanup_for_env(project_dir, pioenv):
     return True
 
 
+def deploy_unity_config(project_dir, pioenv):
+    """Unity ライブラリ単体ビルド時に unity_config.h を参照できるよう配置する。"""
+    libdeps_dir = join(project_dir, ".pio", "libdeps", pioenv)
+    config_src = join(project_dir, "test", "unity_config.h")
+    print(f"Deploying unity_config.h for {pioenv}...")
+
+    if not isfile(config_src):
+        print(f"unity_config.h not found at {config_src}")
+        return False
+
+    if not isdir(libdeps_dir):
+        print(f"libdeps directory not found at {libdeps_dir}")
+        return False
+
+    deployed = False
+    for item in os.listdir(libdeps_dir):
+        if not item.startswith("Unity"):
+            continue
+
+        unity_src_dir = join(libdeps_dir, item, "src")
+        if not isdir(unity_src_dir):
+            continue
+
+        dst = join(unity_src_dir, "unity_config.h")
+        shutil.copy2(config_src, dst)
+        print(f"Deployed unity_config.h to {dst}")
+        deployed = True
+
+    if not deployed:
+        print("Unity library not found (yet).")
+
+    return deployed
+
+
+def prepare_test_deps(project_dir, pioenv):
+    prepare_cpp_httplib(project_dir, pioenv)
+    deploy_unity_config(project_dir, pioenv)
+
+
 def register_platformio_hooks(env):
     project_dir = env.subst("$PROJECT_DIR")
     pioenv = env.subst("$PIOENV")
 
-    def cleanup_cpp_httplib(source, target, env):
-        cleanup_for_env(project_dir, pioenv)
+    def on_prepare(source, target, env):
+        prepare_test_deps(project_dir, pioenv)
 
-    env.AddPreAction("buildprog", cleanup_cpp_httplib)
+    env.AddPreAction("buildprog", on_prepare)
 
     for lib in env.GetLibBuilders():
         lib_name = lib.get_name()
-        if "cpp-httplib" not in lib_name and "httplib" not in lib_name:
+        if "cpp-httplib" not in lib_name and "httplib" not in lib_name and not lib_name.startswith("Unity"):
             continue
         for item in lib.get_build_items():
-            env.AddPreAction(item, cleanup_cpp_httplib)
+            env.AddPreAction(item, on_prepare)
 
-    cleanup_for_env(project_dir, pioenv)
+    prepare_test_deps(project_dir, pioenv)
 
 
 try:
@@ -85,4 +124,4 @@ except Exception:
 if __name__ == "__main__":
     project_dir = dirname(dirname(abspath(__file__)))
     env_name = sys.argv[1] if len(sys.argv) > 1 else "test_unit"
-    cleanup_for_env(project_dir, env_name)
+    prepare_test_deps(project_dir, env_name)
