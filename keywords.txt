@@ -1,0 +1,16 @@
+HttpClient
+HTTPS
+HTTP
+ESP32
+SSL
+TLS
+WiFi
+REST
+API
+JSON
+multipart
+cookie
+redirect
+retry
+proxy
+streaming

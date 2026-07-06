@@ -103,6 +103,8 @@ namespace canaspad
         Result<HttpResult> handleChunkedResponse(Connection *connection, HttpResult &result, size_t startingPos);
         Result<HttpResult> handleChunkedResponse(Connection *connection, HttpResult &result, size_t startingPos, ReadOptions options);
 
+        void applyConnectionTimeouts(Connection *connection);
+
         std::string buildRequestString(const Request &request);
     };
 

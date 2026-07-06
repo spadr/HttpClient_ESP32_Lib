@@ -168,8 +168,8 @@ jobs:
 
       - name: Build ESP32 Tests
         run: |
-          pio run -e m5stack-atom --verbose
-          pio run -e m5stack-atom-ex --verbose
+          pio test -e test_e2e --without-uploading --without-testing
+          pio run -d examples/BasicRequest -e m5stack-atom --verbose
 
   # Code Coverage Analysis
   coverage:

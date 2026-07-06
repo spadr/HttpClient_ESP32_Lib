@@ -492,6 +492,14 @@ namespace canaspad
         return Result<HttpResult>(ErrorInfo(ErrorCode::TooManyRedirects, "Too many redirects"));
     }
 
+    void HttpClient::applyConnectionTimeouts(Connection *connection)
+    {
+        if (connection != nullptr)
+        {
+            connection->setTimeouts(m_timeouts.connect, m_timeouts.read, m_timeouts.write);
+        }
+    }
+
     Result<std::shared_ptr<Connection>> HttpClient::establishConnection(const Request &request)
     {
         std::string host = Utils::extractHost(request.getUrl());
@@ -524,6 +532,7 @@ namespace canaspad
 
     Result<std::shared_ptr<Connection>> HttpClient::establishDirectConnection(std::shared_ptr<Connection> connection, const std::string &host, int port)
     {
+        applyConnectionTimeouts(connection.get());
         auto connectStart = std::chrono::steady_clock::now();
         if (!connection->connect(host, port))
         {
@@ -543,6 +552,7 @@ namespace canaspad
         int proxyPort = Utils::extractPort(m_options.proxyUrl);
         m_options.verifySsl = Utils::extractScheme(m_options.proxyUrl) == "https";
 
+        applyConnectionTimeouts(connection.get());
         auto connectStart = std::chrono::steady_clock::now();
         if (!connection->connect(proxyHost, proxyPort))
         {
@@ -1021,7 +1031,7 @@ namespace canaspad
             oss << "User-Agent: HttpClient-ESP32-Lib/1.0.0\r\n";
         }
 
-        const auto &multipartFormData = request.getMultipartFormData();
+        const auto &multipartParts = request.getMultipartParts();
 
         // プロキシ認証
         if (!m_options.proxyUrl.empty())
@@ -1033,17 +1043,26 @@ namespace canaspad
             }
         }
 
-        if (!multipartFormData.empty())
+        if (!multipartParts.empty())
         {
             std::string boundary = Utils::generateBoundary();
             oss << "Content-Type: multipart/form-data; boundary=" << boundary << "\r\n";
 
             std::string body;
-            for (const auto &[key, value] : multipartFormData)
+            for (const auto &part : multipartParts)
             {
                 body += "--" + boundary + "\r\n";
-                body += "Content-Disposition: form-data; name=\"" + key + "\"\r\n\r\n";
-                body += value + "\r\n";
+                if (!part.filename.empty())
+                {
+                    body += "Content-Disposition: form-data; name=\"" + part.name +
+                            "\"; filename=\"" + part.filename + "\"\r\n";
+                    body += "Content-Type: " + part.contentType + "\r\n\r\n";
+                }
+                else
+                {
+                    body += "Content-Disposition: form-data; name=\"" + part.name + "\"\r\n\r\n";
+                }
+                body += part.content + "\r\n";
             }
             body += "--" + boundary + "--\r\n";
 

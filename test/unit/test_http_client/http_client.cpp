@@ -246,6 +246,47 @@ void test_cancel_request()
     TEST_ASSERT_EQUAL_INT(static_cast<int>(ErrorCode::RequestCancelled), static_cast<int>(result.error().code));
 }
 
+void test_multipart_file_upload()
+{
+    ClientOptions options;
+    options.verifySsl = false;
+    HttpClient client(options, true);
+    auto *mockClient = static_cast<MockWiFiClientSecure *>(client.getConnection());
+
+    injectHttpResponse(mockClient,
+                       "HTTP/1.1 200 OK\r\n"
+                       "Content-Length: 2\r\n\r\n"
+                       "OK");
+
+    Request request;
+    request.setUrl("http://example.com/upload")
+        .setMethod(HttpMethod::POST)
+        .addMultipartFile("file", "report.txt", "hello file", "text/plain");
+
+    auto result = client.send(request);
+    TestHelpers::assertResultSuccess(result, "Multipart file upload should succeed");
+
+    bool dispositionFound = false;
+    bool contentTypeFound = false;
+    for (const auto &entry : mockClient->getCommunicationLog().getLog())
+    {
+        if (entry.type == CommunicationLog::Entry::Type::Sent)
+        {
+            std::string requestStr(entry.data.begin(), entry.data.end());
+            if (requestStr.find("Content-Disposition: form-data; name=\"file\"; filename=\"report.txt\"") != std::string::npos)
+            {
+                dispositionFound = true;
+            }
+            if (requestStr.find("Content-Type: text/plain") != std::string::npos)
+            {
+                contentTypeFound = true;
+            }
+        }
+    }
+    TEST_ASSERT_TRUE(dispositionFound);
+    TEST_ASSERT_TRUE(contentTypeFound);
+}
+
 #ifdef NATIVE_TEST
 int main()
 {
@@ -257,6 +298,7 @@ int main()
     RUN_TEST(test_send_streaming_callback);
     RUN_TEST(test_progress_and_body_callbacks);
     RUN_TEST(test_cancel_request);
+    RUN_TEST(test_multipart_file_upload);
     return UNITY_END();
 }
 #endif

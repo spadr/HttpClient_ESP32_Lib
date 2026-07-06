@@ -1,0 +1,44 @@
+{
+  "name": "HttpClient_ESP32_Lib",
+  "version": "1.0.0",
+  "description": "Modern C++ HTTP client library for ESP32 with HTTPS, auth, cookies, redirects, and retries.",
+  "keywords": ["http", "https", "esp32", "client", "ssl", "tls", "wifi"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/canaspad/HttpClient_ESP32_Lib.git"
+  },
+  "authors": [
+    {
+      "name": "canaspad"
+    }
+  ],
+  "license": "GPL-3.0-only",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "headers": ["HttpClient.h"],
+  "build": {
+    "srcFilter": [
+      "+<*>",
+      "-<native/*>",
+      "-<esp32/*>",
+      "-<Config.cpp>",
+      "-<ConfigExample.h>",
+      "-<core/mock/*>",
+      "-<core/WiFiSecureConnectionMock.cpp>",
+      "-<core/NativeSocketConnection.*>"
+    ]
+  },
+  "export": {
+    "exclude": [
+      "src/native",
+      "src/esp32",
+      "src/Config.cpp",
+      "src/core/mock",
+      "test",
+      "docker",
+      "tools",
+      "scripts",
+      ".github"
+    ]
+  }
+}

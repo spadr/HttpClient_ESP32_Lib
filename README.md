@@ -11,7 +11,7 @@
 *   💡 **モダンな API**: メソッドチェーンで直感的にリクエストを構築
 *   🔒 **HTTPS 完全対応**: SSL/TLS 検証、ルート CA 設定、時刻同期ヘルパー
 *   🔁 **堅牢な通信**: リダイレクト自動追跡、自動リトライ、タイムアウト管理
-*   🍪 **状態管理**: Cookie の自動維持、セッション管理
+*   🍪 **状態管理**: Cookie の自動維持（`enableCookies(true)` で有効化）
 *   🔑 **認証**: Basic 認証、Bearer (Token) 認証をネイティブサポート
 
 ## 🚀 クイックスタート
@@ -27,12 +27,14 @@ lib_deps =
 **Arduino IDE**:
 ZIPとしてダウンロードし、「スケッチ」→「ライブラリをインクルード」→「.ZIP形式のライブラリをインストール」から追加してください。
 
+サンプルスケッチは [`examples/BasicRequest`](examples/BasicRequest) を参照してください（Arduino IDE: `BasicRequest.ino` / PlatformIO: `src/main.cpp`）。
+
 ### 基本的な使い方
 
 ```cpp
 #include <Arduino.h>
 #include <WiFi.h>
-#include "HttpClient.h"
+#include <HttpClient.h>
 
 using namespace canaspad;
 
@@ -44,7 +46,6 @@ void setup() {
     while (WiFi.status() != WL_CONNECTED) delay(500);
 
     // 2. 時刻同期 (HTTPS通信に必須)
-    // ライブラリ付属のヘルパー、または configTime() を使用
     HttpClient::syncTime(); 
 
     // 3. クライアントの設定
@@ -52,6 +53,7 @@ void setup() {
     options.followRedirects = true;
     options.verifySsl = true; // 本番環境では true 推奨
     HttpClient client(options);
+    client.enableCookies(true); // Cookie 自動送信を有効化
 
     // 4. リクエストの構築 (Fluent Interface)
     Request request;
@@ -95,14 +97,52 @@ options.bearerToken = "your-access-token";
 HttpClient::Timeouts timeouts;
 timeouts.connect = std::chrono::seconds(10); // 接続タイムアウト
 timeouts.read    = std::chrono::seconds(30); // 読み込みタイムアウト
+timeouts.write   = std::chrono::seconds(30); // 書き込みタイムアウト
 client.setTimeouts(timeouts);
 ```
 
 ### Multipart/form-data 送信
 ```cpp
+// テキストフィールド
 request.setMultipartFormData({
-    {"username", "john_doe"},
-    {"file", "file_content_here"}
+    {"username", "john_doe"}
+});
+
+// ファイルパート (filename / Content-Type 付き)
+request.addMultipartFile(
+    "file",
+    "report.txt",
+    "file content here",
+    "text/plain"
+);
+```
+
+### プロキシ
+```cpp
+ClientOptions options;
+options.proxyUrl = "http://user:pass@proxy.example.com:3128";
+HttpClient client(options);
+```
+
+### ストリーミング受信
+```cpp
+auto result = client.sendStreaming(request, [](const char *data, size_t size) {
+    // レスポンス本文を逐次処理 (result.value().body は空)
+});
+```
+
+### リクエストキャンセル
+```cpp
+client.cancel("request-id");
+```
+
+### 進捗コールバック
+```cpp
+client.setProgressCallback([](size_t received, size_t total) {
+    Serial.printf("Progress: %zu / %zu\n", received, total);
+});
+client.setResponseBodyCallback([](const char *data, size_t size) {
+    // 本文チャンクを逐次受信
 });
 ```
 
@@ -112,7 +152,7 @@ request.setMultipartFormData({
 
 *   **[トラブルシューティング](docs/TROUBLESHOOTING_GUIDE.md)**: うまく動かない場合
 *   **[開発環境構築 (WSL)](docs/WSL_ESP32_COMPLETE_GUIDE.md)**: WSL での ESP32 開発環境セットアップ
-*   **[テスト手順](docs/TESTING_PROCEDURE.md)**: 実機テストの実行方法
+*   **[開発ワークフロー](docs/DEVELOPMENT_WORKFLOW.md)**: テスト実行と実機開発の手順
 
 ## 📝 ライセンス
 
