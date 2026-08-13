@@ -94,9 +94,34 @@ def prepare_test_deps(project_dir, pioenv):
     deploy_unity_config(project_dir, pioenv)
 
 
+def configure_native_compiler(env):
+    """PlatformIO native uses `cc`/`c++`; Windows MinGW often only ships gcc/g++."""
+    use_gcc = shutil.which("gcc")
+    use_gxx = shutil.which("g++")
+    cc_path = shutil.which("cc")
+    cxx_path = shutil.which("c++")
+
+    # A copied gcc.exe named cc.exe cannot find cc1; prefer real gcc/g++ on Windows.
+    if sys.platform.startswith("win") and use_gcc:
+        print("Using gcc as CC for native tests")
+        env.Replace(CC="gcc")
+    elif cc_path is None and use_gcc:
+        print("cc not found; using gcc")
+        env.Replace(CC="gcc")
+
+    if sys.platform.startswith("win") and use_gxx:
+        print("Using g++ as CXX/LINK for native tests")
+        env.Replace(CXX="g++", LINK="g++")
+        env.Append(LIBS=["ws2_32"])
+    elif cxx_path is None and use_gxx:
+        print("c++ not found; using g++")
+        env.Replace(CXX="g++", LINK="g++")
+
+
 def register_platformio_hooks(env):
     project_dir = env.subst("$PROJECT_DIR")
     pioenv = env.subst("$PIOENV")
+    configure_native_compiler(env)
 
     def on_prepare(source, target, env):
         prepare_test_deps(project_dir, pioenv)

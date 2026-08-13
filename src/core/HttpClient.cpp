@@ -12,18 +12,13 @@
 #endif
 #include "RequestValidator.h"
 #include "Logger.h"
+#include "../time/TimeSynchronizer.h"
 #include <iostream>
 #include <cctype>
 
 // Static constexpr member definitions (required for C++14/17 compatibility)
 constexpr size_t canaspad::HttpClient::DEFAULT_BUFFER_SIZE;
 constexpr size_t canaspad::HttpClient::DEFAULT_REQUEST_BUFFER_RESERVE;
-#ifndef ARDUINO_ARCH_NATIVE
-#include <Arduino.h>
-#include <sys/time.h>
-#else
-#include "../native_arduino_compat.h"
-#endif
 
 namespace canaspad
 {
@@ -61,81 +56,52 @@ namespace canaspad
         }
     }
 
-    // Static implementation of time synchronization
+    // Compatibility wrapper: HTTP timestamp API only. Prefer AutoSync (SNTP then HTTP)
+    // or an application-provided system clock for production HTTPS.
     bool HttpClient::syncTime(const std::string &timeUrl)
     {
 #ifdef ARDUINO_ARCH_NATIVE
-        LOG_INFO_S("Native environment - skipping time sync");
+        LOG_INFO_S("Native environment - skipping live HTTP time sync");
+        (void)timeUrl;
         return true;
 #else
-        LOG_INFO_S("Synchronizing time via HTTP...");
-
-        // We must disable SSL verification for time sync because
-        // correct time is needed to verify certificates!
-        ClientOptions options;
-        options.verifySsl = false;
-        options.skipTimeCheck = true; // Allow connection even if time is not set
-        options.followRedirects = true;
-
-        HttpClient client(options, false);
-
-        Request request;
-        request.setUrl(timeUrl)
-            .setMethod(HttpMethod::GET);
-
-        // 時刻同期サーバーはUser-Agentを要求するため追加
-        // HttpClient-ESP32-Lib/1.0.0
-        request.addHeader("User-Agent", "HttpClient-ESP32-Lib/1.0.0");
-
-        // Measure round-trip time for better accuracy
-        unsigned long startMillis = millis();
-        auto result = client.send(request);
-        unsigned long endMillis = millis();
-
-        if (result.isSuccess())
-        {
-            auto response = result.value();
-            if (response.statusCode == 200)
-            {
-                try
-                {
-                    long serverTimestamp = std::stol(response.body);
-                    if (serverTimestamp > 1000000000)
-                    { // Basic sanity check (after year 2001)
-                        // Calculate latency compensation (assume symmetric network delay)
-                        // Latency = (RTT) / 2
-                        long latencyMillis = (endMillis - startMillis) / 2;
-
-                        struct timeval tv;
-                        tv.tv_sec = serverTimestamp + (latencyMillis / 1000);
-                        tv.tv_usec = (latencyMillis % 1000) * 1000;
-                        settimeofday(&tv, NULL);
-
-                        // Set timezone
-                        setenv("TZ", "JST-9", 1);
-                        tzset();
-
-                        LOG_INFO("Time synchronized: %ld (Latency: %ld ms)", tv.tv_sec, latencyMillis * 2);
-                        return true;
-                    }
-                }
-                catch (...)
-                {
-                    LOG_ERROR_S("Failed to parse time response");
-                }
-            }
-            else
-            {
-                LOG_ERROR("Time sync failed. Status: %d", response.statusCode);
-            }
-        }
-        else
-        {
-            LOG_ERROR("Time sync connection failed: %s", result.error().message.c_str());
-        }
-
-        return false;
+        HttpApiTimeSynchronizer synchronizer(timeUrl);
+        return synchronizer.synchronize().isSuccess();
 #endif
+    }
+
+    void HttpClient::setTimeSyncManager(std::unique_ptr<TimeSyncManager> manager)
+    {
+        m_timeSyncManager = std::move(manager);
+    }
+
+    Result<void> HttpClient::ensureTimeForTls()
+    {
+        const TimePolicy policy = effectiveTimePolicy(m_options);
+        if (policy == TimePolicy::Ignore || !m_options.verifySsl)
+        {
+            return Result<void>();
+        }
+
+        if (m_timeSyncManager)
+        {
+            return m_timeSyncManager->ensureTime(policy);
+        }
+
+        if (isSystemTimeValidForTls(SystemTime::nowUnixSeconds()))
+        {
+            return Result<void>();
+        }
+
+        if (policy == TimePolicy::RequireValidTime)
+        {
+            return Result<void>(ErrorInfo(
+                ErrorCode::TimeNotSet,
+                "System time is not set. Synchronize with SNTP or HTTP time API, or use skipTimeCheck / TimePolicy::Ignore."));
+        }
+
+        m_timeSyncManager = TimeSyncManager::createDefault(m_options);
+        return m_timeSyncManager->ensureTime(policy);
     }
 
     HttpClient::HttpClient(const ClientOptions &options, bool useMock)
@@ -150,33 +116,12 @@ namespace canaspad
 #endif
                   )),
           m_auth(std::make_unique<Auth>(options)),
-          m_isInitialized(true),
-          m_initializationError(ErrorCode::None, ""),
-          m_useMock(useMock),
-          m_options(options)
+          m_options(options),
+          m_useMock(useMock)
     {
         if (useMock)
         {
             m_mockConnection = std::make_shared<MockWiFiClientSecure>(options);
-        }
-        else
-        {
-            // m_connectionPool は初期化子リストですでに初期化されているため再作成不要
-            // m_connectionPool = std::make_unique<ConnectionPool>(options);
-
-#ifndef ARDUINO_ARCH_NATIVE
-            time_t now;
-            time(&now);
-            // 時刻未設定（2000年以前）かつ、時刻チェックが有効で、かつSSL検証が有効な場合のみエラーとする
-            // 時刻同期のためのHTTP通信(SSL検証なし)などを許可するため
-            if (!options.skipTimeCheck && options.verifySsl && now < 3600 * 9)
-            {
-                m_isInitialized = false;
-                m_initializationError = (ErrorInfo(
-                    ErrorCode::TimeNotSet,
-                    "System time is not set. Please synchronize with NTP server or use skipTimeCheck option."));
-            }
-#endif
         }
     }
 
@@ -201,9 +146,10 @@ namespace canaspad
     {
         LOG_DEBUG_S("HttpClient::send called");
         LOG_DEBUG("Initial request URL: %s", request.getUrl().c_str());
-        if (!m_isInitialized)
+        auto timeResult = ensureTimeForTls();
+        if (timeResult.isError())
         {
-            return Result<HttpResult>(std::move(m_initializationError));
+            return Result<HttpResult>(timeResult.error());
         }
 
         m_cancelled = false;
@@ -979,9 +925,10 @@ namespace canaspad
             return Result<HttpResult>(ErrorInfo(ErrorCode::InvalidOption, "Chunk callback is required for streaming"));
         }
 
-        if (!m_isInitialized)
+        auto timeResult = ensureTimeForTls();
+        if (timeResult.isError())
         {
-            return Result<HttpResult>(std::move(m_initializationError));
+            return Result<HttpResult>(timeResult.error());
         }
 
         m_cancelled = false;

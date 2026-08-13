@@ -18,6 +18,7 @@ namespace canaspad
         InvalidURL,
         RequestCancelled,
         TimeNotSet,
+        TimeSyncFailed,
         UnsupportedOperation,
         ProxyAuthenticationRequired,
         MissingHeader,

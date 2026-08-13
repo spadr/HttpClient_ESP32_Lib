@@ -19,6 +19,8 @@
 namespace canaspad
 {
 
+    class TimeSyncManager;
+
     class HttpClient
     {
     public:
@@ -51,8 +53,10 @@ namespace canaspad
         using ChunkCallback = std::function<void(const char *, size_t)>;
         Result<HttpResult> sendStreaming(const Request &request, ChunkCallback chunkCallback);
 
-        // Time synchronization
+        // Compatibility wrapper around HttpApiTimeSynchronizer.
         static bool syncTime(const std::string &timeUrl = "https://timestamp.canaspad.net/");
+
+        void setTimeSyncManager(std::unique_ptr<TimeSyncManager> manager);
 
         Connection *getConnection() const;
 
@@ -66,9 +70,7 @@ namespace canaspad
         std::function<void(size_t, size_t)> m_progressCallback;
         std::function<void(const char *, size_t)> m_responseBodyCallback;
         bool m_useMock = false;
-
-        bool m_isInitialized = true;
-        ErrorInfo m_initializationError;
+        std::unique_ptr<TimeSyncManager> m_timeSyncManager;
         std::atomic<bool> m_cancelled{false};
 
         struct ReadOptions
@@ -104,6 +106,7 @@ namespace canaspad
         Result<HttpResult> handleChunkedResponse(Connection *connection, HttpResult &result, size_t startingPos, ReadOptions options);
 
         void applyConnectionTimeouts(Connection *connection);
+        Result<void> ensureTimeForTls();
 
         std::string buildRequestString(const Request &request);
     };
